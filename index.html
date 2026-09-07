@@ -261,16 +261,169 @@
     border: none;
     color: #fff;
     font-family: "Work Sans", sans-serif;
-    font-weight: 500;
-    font-size: 13px;
-    padding: 7px 12px;
+    font-weight: 600;
+    font-size: 14px;
+    padding: 10px 18px;
     border-radius: 20px;
     cursor: pointer;
     white-space: nowrap;
+    box-shadow: 0 2px 8px rgba(47, 111, 98, 0.2);
+    transition: all 0.2s ease;
   }
   .sign-in-btn:hover{
-    filter: brightness(1.08);
+    filter: brightness(1.1);
+    box-shadow: 0 4px 12px rgba(47, 111, 98, 0.3);
+    transform: translateY(-1px);
   }
+
+  /* Offline & Sync Status */
+  .offline-indicator{
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    font-size: 12px;
+    color: var(--status-critical);
+    font-weight: 500;
+  }
+  .offline-dot{
+    width: 6px;
+    height: 6px;
+    background: var(--status-critical);
+    border-radius: 50%;
+  }
+
+  /* Overspending Alert */
+  .alert-badge{
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    background: color-mix(in srgb, var(--status-critical) 16%, transparent);
+    color: var(--status-critical);
+    font-size: 12px;
+    font-weight: 600;
+    padding: 4px 10px;
+    border-radius: 100px;
+    margin-top: 8px;
+  }
+  .overspend-badge{
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    background: color-mix(in srgb, var(--status-critical) 12%, transparent);
+    color: var(--status-critical);
+    font-size: 11px;
+    padding: 2px 8px;
+    border-radius: 4px;
+  }
+
+  /* Savings Goals UI */
+  .goals-section{ margin-bottom: 28px; }
+  .goal-card{
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 14px 16px;
+    margin-bottom: 10px;
+    box-shadow: var(--shadow);
+  }
+  .goal-header{
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 10px;
+  }
+  .goal-name{
+    font-weight: 500;
+    font-size: 14px;
+  }
+  .goal-progress{
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+  }
+  .goal-bar{
+    height: 6px;
+    background: var(--surface-2);
+    border-radius: 100px;
+    border: 1px solid var(--border);
+    overflow: hidden;
+  }
+  .goal-bar-fill{
+    background: linear-gradient(90deg, var(--accent-personal), var(--series-3));
+    height: 100%;
+    border-radius: 100px;
+  }
+  .goal-stats{
+    display: flex;
+    font-size: 12px;
+    color: var(--text-secondary);
+    justify-content: space-between;
+  }
+  .goal-status{
+    font-size: 12px;
+    font-weight: 500;
+    margin-top: 6px;
+  }
+  .goal-status.on-track{ color: var(--status-good); }
+  .goal-status.behind{ color: var(--status-warning-bg); }
+
+  /* Forecast & Trends */
+  .forecast-card{
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 14px 16px;
+    margin-bottom: 12px;
+    box-shadow: var(--shadow);
+  }
+  .forecast-month{
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 8px 0;
+    border-bottom: 1px solid var(--border);
+    font-size: 13px;
+  }
+  .forecast-month:last-child{ border-bottom: none; }
+  .forecast-label{ color: var(--text-secondary); }
+  .forecast-value{
+    font-family: "IBM Plex Mono", monospace;
+    font-weight: 500;
+  }
+  .forecast-warning{
+    color: var(--status-warning-bg);
+  }
+  .forecast-critical{
+    color: var(--status-critical);
+  }
+
+  /* Year-over-Year */
+  .yoy-comparison{
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 10px;
+    margin-top: 10px;
+  }
+  .yoy-item{
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+  }
+  .yoy-label{
+    font-size: 11px;
+    color: var(--text-muted);
+    text-transform: uppercase;
+  }
+  .yoy-value{
+    font-family: "IBM Plex Mono", monospace;
+    font-weight: 500;
+  }
+  .yoy-change{
+    font-size: 12px;
+    font-weight: 500;
+  }
+  .yoy-change.up{ color: var(--status-warning-bg); }
+  .yoy-change.down{ color: var(--status-good); }
 
   .tabs{
     display: flex;
@@ -1090,7 +1243,10 @@
     backupImportError: null,
     histCaption: { personal: null, wedding: null },
     lastSyncedAt: null,
-    syncErrors: []
+    syncErrors: [],
+    savingsGoals: { items: [] },
+    isOnline: navigator.onLine,
+    overBudgetCategories: { personal: [], wedding: [] }
   };
 
   function uid(prefix){
@@ -1385,6 +1541,7 @@
   // ---------- rendering ----------
 
   function render(){
+    updateOverBudgetCategories();
     renderTabs();
     ["personal", "wedding"].forEach(function(t){
       var panel = document.getElementById(t + "-panel");
@@ -1734,6 +1891,27 @@
     html += '  </div>';
     html += '</section>';
 
+    // Add forecast section
+    html += renderForecastSection(tracker);
+
+    // Add year-over-year if data available
+    var yoyComparison = getYoYComparison(tracker, monthKey);
+    if(Object.keys(yoyComparison).length > 0){
+      html += '<section><div class="section-head"><div class="section-title">📈 vs Last Year</div></div>';
+      html += '<div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px;">';
+      Object.keys(yoyComparison).slice(0, 4).forEach(function(cat){
+        var data = yoyComparison[cat];
+        html += '<div class="card" style="padding: 12px 14px;"><div style="font-size: 12px; color: var(--text-secondary); margin-bottom: 4px;">' + escapeHtml(cat) + '</div>';
+        html += '<div class="yoy-comparison">';
+        html += '<div class="yoy-item"><div class="yoy-label">This year</div><div class="yoy-value">' + currency.format(data.current) + '</div></div>';
+        html += '<div class="yoy-item"><div class="yoy-label">Last year</div><div class="yoy-value">' + currency.format(data.previous) + '</div></div>';
+        html += '</div>';
+        html += '<div class="yoy-change ' + (data.pctChange > 0 ? 'up' : data.pctChange < 0 ? 'down' : '') + '">' + (data.pctChange > 0 ? '+' : '') + data.pctChange + '%</div>';
+        html += '</div>';
+      });
+      html += '</div></section>';
+    }
+
     return html;
   }
 
@@ -2053,6 +2231,7 @@
 
   function renderManagePage(tracker){
     var html = subnavHtml(tracker);
+    if(tracker === "personal") html += renderSavingsGoalsSection();
     html += renderCategoriesManageSection(tracker);
     html += renderPaymentMethodsSection();
     if(tracker === "wedding") html += renderVendorsSection();
@@ -3090,6 +3269,12 @@
   function renderSyncStatus(){
     var el = document.getElementById("sync-status");
     if(!el) return;
+    
+    if(!state.isOnline){
+      el.innerHTML = '<div class="offline-indicator"><span class="offline-dot"></span>📱 Offline · Changes saved locally. Will sync when back online.</div>';
+      return;
+    }
+    
     if(!state.lastSyncedAt){ el.textContent = ""; return; }
     var parts = ["Last refreshed " + state.lastSyncedAt.toLocaleTimeString()];
     var lastEntry = lastEntryTimestamp();
@@ -3355,7 +3540,8 @@
       incomeTypes: state.incomeTypes,
       recurringIncome: state.recurringIncome,
       salarySetup: state.salarySetup,
-      vendors: state.vendors
+      vendors: state.vendors,
+      savingsGoals: state.savingsGoals
     };
   }
 
@@ -3670,6 +3856,9 @@
     if(!state.vendors.wedding) state.vendors.wedding = { items: [] };
     if(!state.vendors.wedding.items) state.vendors.wedding.items = [];
     state.vendors.wedding.items.forEach(normalizeExpense);
+    
+    state.savingsGoals = data.savingsGoals || { items: [] };
+    if(!state.savingsGoals.items) state.savingsGoals.items = [];
   }
 
   function loadFromDrive(){
@@ -3714,6 +3903,8 @@
     if(persistTimer) clearTimeout(persistTimer);
     persistTimer = setTimeout(function(){
       persistTimer = null;
+      updateOverBudgetCategories();
+      saveToIndexedDB();
       persistToDriveNow();
     }, 800);
   }
@@ -3896,6 +4087,267 @@
     connectDrive();
   }
 
+  // ---------- Offline Mode & IndexedDB ----------
+
+  function initOfflineSupport(){
+    window.addEventListener("online", function(){
+      state.isOnline = true;
+      showBanner("Back online! Syncing your changes now…");
+      persistToDriveNow();
+      render();
+    });
+    window.addEventListener("offline", function(){
+      state.isOnline = false;
+      showBanner("You're offline. Changes are saved locally and will sync when you're back online.", { warn: true });
+      render();
+    });
+    
+    // Initialize IndexedDB for offline storage
+    if(!window.indexedDB) return;
+    var dbReq = window.indexedDB.open("BudgetLedgerDB", 1);
+    dbReq.onerror = function(){ console.log("IndexedDB failed"); };
+    dbReq.onsuccess = function(e){
+      window.budgetDB = e.target.result;
+      saveToIndexedDB();
+    };
+    dbReq.onupgradeneeded = function(e){
+      var db = e.target.result;
+      if(!db.objectStoreNames.contains("data")){
+        db.createObjectStore("data", { keyPath: "id" });
+      }
+    };
+  }
+
+  function saveToIndexedDB(){
+    if(!window.budgetDB) return;
+    try{
+      var tx = window.budgetDB.transaction(["data"], "readwrite");
+      var store = tx.objectStore("data");
+      store.put({ id: "budgetData", data: buildFullBackupObject(), timestamp: Date.now() });
+    }catch(e){ console.log("IndexedDB save failed", e); }
+  }
+
+  function loadFromIndexedDB(){
+    if(!window.budgetDB) return Promise.resolve(null);
+    return new Promise(function(resolve){
+      try{
+        var tx = window.budgetDB.transaction(["data"], "readonly");
+        var store = tx.objectStore("data");
+        var req = store.get("budgetData");
+        req.onsuccess = function(){ resolve(req.result ? req.result.data : null); };
+        req.onerror = function(){ resolve(null); };
+      }catch(e){ resolve(null); }
+    });
+  }
+
+  // ---------- Overspending Alerts ----------
+
+  function updateOverBudgetCategories(){
+    var personal = [];
+    var wedding = [];
+    
+    if(state.budgets.personal && state.budgets.personal.categories){
+      var totals = categoryTotals("personal", state.personalMonth);
+      state.budgets.personal.categories.forEach(function(cat){
+        if(totals[cat.name] && totals[cat.name] > cat.budget){
+          personal.push({ name: cat.name, spent: totals[cat.name], budget: cat.budget });
+        }
+      });
+    }
+    
+    var weddingMonth = monthKeyFor("wedding");
+    if(state.budgets.wedding && state.budgets.wedding.categories){
+      var weddingTotals = categoryTotals("wedding", weddingMonth);
+      state.budgets.wedding.categories.forEach(function(cat){
+        if(weddingTotals[cat.name] && weddingTotals[cat.name] > cat.budget){
+          wedding.push({ name: cat.name, spent: weddingTotals[cat.name], budget: cat.budget });
+        }
+      });
+    }
+    
+    state.overBudgetCategories.personal = personal;
+    state.overBudgetCategories.wedding = wedding;
+  }
+
+  function renderOverBudgetAlert(){
+    var total = state.overBudgetCategories.personal.length + state.overBudgetCategories.wedding.length;
+    if(total === 0) return "";
+    return '<div class="alert-badge">⚠️ ' + total + ' categor' + (total === 1 ? 'y' : 'ies') + ' over budget</div>';
+  }
+
+  // ---------- Savings Goals ----------
+
+  function saveSavingsGoals(){
+    schedulePersist();
+  }
+
+  function addSavingsGoal(goal){
+    if(!state.savingsGoals) state.savingsGoals = { items: [] };
+    goal.id = uid("goal");
+    goal.createdAt = todayStr();
+    state.savingsGoals.items.push(goal);
+    saveSavingsGoals();
+  }
+
+  function removeSavingsGoal(id){
+    if(!state.savingsGoals || !state.savingsGoals.items) return;
+    state.savingsGoals.items = state.savingsGoals.items.filter(function(g){ return g.id !== id; });
+    saveSavingsGoals();
+  }
+
+  function updateSavingsGoal(id, changes){
+    if(!state.savingsGoals || !state.savingsGoals.items) return;
+    var goal = state.savingsGoals.items.find(function(g){ return g.id === id; });
+    if(goal){ Object.assign(goal, changes); saveSavingsGoals(); }
+  }
+
+  function renderSavingsGoalsSection(){
+    if(!state.savingsGoals || !state.savingsGoals.items){
+      state.savingsGoals = { items: [] };
+    }
+    
+    var html = '<section class="goals-section" id="goals-section">';
+    html += '<div class="section-head"><div class="section-title">Savings Goals</div></div>';
+    
+    if(state.savingsGoals.items.length === 0){
+      html += '<div style="color: var(--text-muted); font-size: 13px; padding: 16px;">No goals yet. <a href="#" onclick="addGoalForm(event)" style="color: var(--accent-personal); cursor: pointer;">Add one →</a></div>';
+    } else {
+      state.savingsGoals.items.forEach(function(goal){
+        var pct = goal.current ? Math.round((goal.current / goal.target) * 100) : 0;
+        var monthlySave = goal.monthlyContribution || 0;
+        var monthsLeft = goal.dueDate ? ((new Date(goal.dueDate) - new Date()) / (1000 * 60 * 60 * 24 * 30)) : 0;
+        var neededMonthly = monthsLeft > 0 ? Math.round((goal.target - (goal.current || 0)) / monthsLeft) : 0;
+        var isOnTrack = monthsLeft <= 0 || monthlySave >= neededMonthly;
+        
+        html += '<div class="goal-card">';
+        html += '<div class="goal-header"><span class="goal-name">' + escapeHtml(goal.name) + '</span></div>';
+        html += '<div class="goal-progress">';
+        html += '<div class="goal-bar"><div class="goal-bar-fill" style="width:' + Math.min(pct, 100) + '%"></div></div>';
+        html += '<div class="goal-stats"><span>' + currency.format(goal.current || 0) + ' / ' + currency.format(goal.target) + '</span><span>' + pct + '%</span></div>';
+        if(monthsLeft > 0){
+          html += '<div class="goal-status ' + (isOnTrack ? 'on-track' : 'behind') + '">';
+          html += isOnTrack ? '✓ On track' : '⚠️ Need ' + currency.format(neededMonthly) + '/mo (currently ' + currency.format(monthlySave) + ')';
+          html += '</div>';
+        }
+        html += '</div>';
+        html += '<div style="display:flex; gap:6px; margin-top:8px; font-size:12px;"><button onclick="editSavingsGoal(\'' + goal.id + '\')" style="appearance:none; background:none; border:none; color:var(--text-secondary); cursor:pointer;">Edit</button><button onclick="removeSavingsGoal(\'' + goal.id + '\'); render();" style="appearance:none; background:none; border:none; color:var(--status-critical); cursor:pointer;">Remove</button></div>';
+        html += '</div>';
+      });
+    }
+    
+    html += '<div style="padding: 12px 0;"><button class="ghost-btn" onclick="showAddGoalForm(event)">+ Add Goal</button></div>';
+    html += '</section>';
+    return html;
+  }
+
+  function showAddGoalForm(ev){
+    if(ev) ev.preventDefault();
+    var name = prompt("Goal name (e.g., Emergency Fund):");
+    if(!name) return;
+    var targetStr = prompt("Target amount (e.g., 5000):");
+    if(!targetStr) return;
+    var target = parseFloat(targetStr);
+    if(isNaN(target) || target <= 0) return;
+    var currentStr = prompt("Current amount (e.g., 0):");
+    var current = currentStr ? parseFloat(currentStr) : 0;
+    if(isNaN(current)) current = 0;
+    
+    addSavingsGoal({
+      name: name,
+      target: target,
+      current: current,
+      monthlyContribution: 0,
+      dueDate: null
+    });
+    render();
+  }
+
+  // ---------- Year-over-Year Comparison ----------
+
+  function getPreviousYearMonth(monthKey){
+    var year = parseInt(monthKey.slice(0, 4));
+    var month = monthKey.slice(4);
+    return (year - 1) + month;
+  }
+
+  function getYoYComparison(tracker, monthKey){
+    var current = categoryTotals(tracker, monthKey);
+    var previous = categoryTotals(tracker, getPreviousYearMonth(monthKey));
+    var comparison = {};
+    
+    Object.keys(current).forEach(function(cat){
+      var curr = current[cat] || 0;
+      var prev = previous[cat] || 0;
+      var change = curr - prev;
+      var pctChange = prev === 0 ? (curr > 0 ? 100 : 0) : Math.round((change / prev) * 100);
+      comparison[cat] = { current: curr, previous: prev, change: change, pctChange: pctChange };
+    });
+    
+    return comparison;
+  }
+
+  // ---------- Forecasting ----------
+
+  function calculateForecast(tracker){
+    var currentMonth = tracker === "personal" ? state.personalMonth : monthKeyFor("wedding");
+    var currentYear = currentMonth.slice(0, 4);
+    var forecast = [];
+    
+    // Get last 3 months average
+    var months = [
+      shiftMonth(currentMonth, -2),
+      shiftMonth(currentMonth, -1),
+      currentMonth
+    ];
+    var totals = months.map(function(m){ return Object.values(categoryTotals(tracker, m)).reduce(function(a,b){ return a + b; }, 0); });
+    var monthlyAvg = totals.length > 0 ? totals.reduce(function(a,b){ return a + b; }) / totals.length : 0;
+    
+    // Project remaining months
+    for(var i = 1; i <= 9; i++){
+      var projMonth = shiftMonth(currentMonth, i);
+      var projYear = projMonth.slice(0, 4);
+      if(projYear === currentYear){
+        forecast.push({
+          month: monthLabel(projMonth),
+          projected: monthlyAvg,
+          remaining: (getBudgetForTracker(tracker) || 0) - (monthlyAvg * i)
+        });
+      }
+    }
+    
+    return forecast;
+  }
+
+  function getBudgetForTracker(tracker){
+    if(!state.budgets[tracker] || !state.budgets[tracker].categories) return 0;
+    return state.budgets[tracker].categories.reduce(function(sum, cat){ return sum + (cat.budget || 0); }, 0);
+  }
+
+  function renderForecastSection(tracker){
+    var forecast = calculateForecast(tracker);
+    if(forecast.length === 0) return '';
+    
+    var budget = getBudgetForTracker(tracker);
+    var html = '<section><div class="section-head"><div class="section-title">Spending Forecast</div><div class="section-hint">At current pace</div></div>';
+    html += '<div class="forecast-card">';
+    
+    forecast.slice(0, 6).forEach(function(f){
+      var isWarning = f.remaining < 0;
+      var isLow = f.remaining < (budget * 0.2) && f.remaining > 0;
+      html += '<div class="forecast-month">';
+      html += '<div class="forecast-label">' + f.month + '</div>';
+      html += '<div class="forecast-value ' + (isWarning ? 'forecast-critical' : isLow ? 'forecast-warning' : '') + '">';
+      html += currency.format(Math.max(0, f.remaining)) + ' left';
+      if(isWarning) html += ' ❌';
+      else if(isLow) html += ' ⚠️';
+      html += '</div>';
+      html += '</div>';
+    });
+    
+    html += '</div></section>';
+    return html;
+  }
+
   // Close auth menu when clicking outside
   document.addEventListener("click", function(){
     closeAuthMenu();
@@ -3904,7 +4356,9 @@
   function init(){
     state.budgets.personal = DEFAULT_BUDGETS.personal;
     state.budgets.wedding = DEFAULT_BUDGETS.wedding;
+    initOfflineSupport();
     renderAuthUI();
+    updateOverBudgetCategories();
     render();
     initSample();
     initDownloads();
