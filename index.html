@@ -1343,7 +1343,7 @@
   }
 
   function monthKeyFor(tracker){
-    return tracker === "personal" ? state.personalMonth : null;
+    return state.personalMonth;
   }
 
   function inMonth(dateStr, monthKey){
@@ -1892,25 +1892,29 @@
     html += '</section>';
 
     // Add forecast section
-    html += renderForecastSection(tracker);
+    html += renderForecastSection(tracker) || "";
 
     // Add year-over-year if data available
-    var yoyComparison = getYoYComparison(tracker, monthKey);
-    if(Object.keys(yoyComparison).length > 0){
-      html += '<section><div class="section-head"><div class="section-title">📈 vs Last Year</div></div>';
-      html += '<div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px;">';
-      Object.keys(yoyComparison).slice(0, 4).forEach(function(cat){
-        var data = yoyComparison[cat];
-        html += '<div class="card" style="padding: 12px 14px;"><div style="font-size: 12px; color: var(--text-secondary); margin-bottom: 4px;">' + escapeHtml(cat) + '</div>';
-        html += '<div class="yoy-comparison">';
-        html += '<div class="yoy-item"><div class="yoy-label">This year</div><div class="yoy-value">' + currency.format(data.current) + '</div></div>';
-        html += '<div class="yoy-item"><div class="yoy-label">Last year</div><div class="yoy-value">' + currency.format(data.previous) + '</div></div>';
-        html += '</div>';
-        html += '<div class="yoy-change ' + (data.pctChange > 0 ? 'up' : data.pctChange < 0 ? 'down' : '') + '">' + (data.pctChange > 0 ? '+' : '') + data.pctChange + '%</div>';
-        html += '</div>';
-      });
-      html += '</div></section>';
-    }
+    try{
+      var yoyComparison = getYoYComparison(tracker, monthKey);
+      if(yoyComparison && Object.keys(yoyComparison).length > 0){
+        html += '<section><div class="section-head"><div class="section-title">📈 vs Last Year</div></div>';
+        html += '<div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px;">';
+        Object.keys(yoyComparison).slice(0, 4).forEach(function(cat){
+          var data = yoyComparison[cat];
+          if(data && !isNaN(data.current) && !isNaN(data.previous)){
+            html += '<div class="card" style="padding: 12px 14px;"><div style="font-size: 12px; color: var(--text-secondary); margin-bottom: 4px;">' + escapeHtml(cat) + '</div>';
+            html += '<div class="yoy-comparison">';
+            html += '<div class="yoy-item"><div class="yoy-label">This year</div><div class="yoy-value">' + currency.format(data.current) + '</div></div>';
+            html += '<div class="yoy-item"><div class="yoy-label">Last year</div><div class="yoy-value">' + currency.format(data.previous) + '</div></div>';
+            html += '</div>';
+            html += '<div class="yoy-change ' + (data.pctChange > 0 ? 'up' : data.pctChange < 0 ? 'down' : '') + '">' + (data.pctChange > 0 ? '+' : '') + data.pctChange + '%</div>';
+            html += '</div>';
+          }
+        });
+        html += '</div></section>';
+      }
+    }catch(e){ console.log("YoY error", e); }
 
     return html;
   }
@@ -4201,6 +4205,16 @@
     if(goal){ Object.assign(goal, changes); saveSavingsGoals(); }
   }
 
+  function editSavingsGoal(id){
+    var goal = state.savingsGoals.items.find(function(g){ return g.id === id; });
+    if(!goal) return;
+    var current = prompt("Update current amount (currently " + goal.current + "):");
+    if(current !== null){
+      updateSavingsGoal(id, { current: parseFloat(current) || 0 });
+      render();
+    }
+  }
+
   function renderSavingsGoalsSection(){
     if(!state.savingsGoals || !state.savingsGoals.items){
       state.savingsGoals = { items: [] };
@@ -4210,7 +4224,7 @@
     html += '<div class="section-head"><div class="section-title">Savings Goals</div></div>';
     
     if(state.savingsGoals.items.length === 0){
-      html += '<div style="color: var(--text-muted); font-size: 13px; padding: 16px;">No goals yet. <a href="#" onclick="addGoalForm(event)" style="color: var(--accent-personal); cursor: pointer;">Add one →</a></div>';
+      html += '<div style="color: var(--text-muted); font-size: 13px; padding: 16px;">No goals yet. <a href="#" onclick="return false;" style="color: var(--accent-personal); cursor: pointer;">Add one →</a></div>';
     } else {
       state.savingsGoals.items.forEach(function(goal){
         var pct = goal.current ? Math.round((goal.current / goal.target) * 100) : 0;
@@ -4230,12 +4244,12 @@
           html += '</div>';
         }
         html += '</div>';
-        html += '<div style="display:flex; gap:6px; margin-top:8px; font-size:12px;"><button onclick="editSavingsGoal(\'' + goal.id + '\')" style="appearance:none; background:none; border:none; color:var(--text-secondary); cursor:pointer;">Edit</button><button onclick="removeSavingsGoal(\'' + goal.id + '\'); render();" style="appearance:none; background:none; border:none; color:var(--status-critical); cursor:pointer;">Remove</button></div>';
+        html += '<div style="display:flex; gap:6px; margin-top:8px; font-size:12px;"><button class="ghost-btn" style="padding: 0; border: none; font-size: 12px;" onclick="editSavingsGoal(\'' + goal.id + '\'); return false;">Edit</button><button class="ghost-btn" style="padding: 0; border: none; font-size: 12px; color: var(--status-critical);" onclick="removeSavingsGoal(\'' + goal.id + '\'); render(); return false;">Remove</button></div>';
         html += '</div>';
       });
     }
     
-    html += '<div style="padding: 12px 0;"><button class="ghost-btn" onclick="showAddGoalForm(event)">+ Add Goal</button></div>';
+    html += '<div style="padding: 12px 0;"><button class="ghost-btn" onclick="showAddGoalForm(event); return false;">+ Add Goal</button></div>';
     html += '</section>';
     return html;
   }
@@ -4271,17 +4285,20 @@
   }
 
   function getYoYComparison(tracker, monthKey){
-    var current = categoryTotals(tracker, monthKey);
-    var previous = categoryTotals(tracker, getPreviousYearMonth(monthKey));
+    var currentTotals = categoryTotals(tracker, monthKey);
+    var previousTotals = categoryTotals(tracker, getPreviousYearMonth(monthKey));
     var comparison = {};
     
-    Object.keys(current).forEach(function(cat){
-      var curr = current[cat] || 0;
-      var prev = previous[cat] || 0;
-      var change = curr - prev;
-      var pctChange = prev === 0 ? (curr > 0 ? 100 : 0) : Math.round((change / prev) * 100);
-      comparison[cat] = { current: curr, previous: prev, change: change, pctChange: pctChange };
-    });
+    if(Array.isArray(currentTotals) && Array.isArray(previousTotals)){
+      currentTotals.forEach(function(cat){
+        var prev = previousTotals.find(function(c){ return c.name === cat.name; });
+        var prevSpent = prev ? (prev.spent || 0) : 0;
+        var currSpent = cat.spent || 0;
+        var change = currSpent - prevSpent;
+        var pctChange = prevSpent === 0 ? (currSpent > 0 ? 100 : 0) : Math.round((change / prevSpent) * 100);
+        comparison[cat.name] = { current: currSpent, previous: prevSpent, change: change, pctChange: pctChange };
+      });
+    }
     
     return comparison;
   }
@@ -4289,7 +4306,8 @@
   // ---------- Forecasting ----------
 
   function calculateForecast(tracker){
-    var currentMonth = tracker === "personal" ? state.personalMonth : monthKeyFor("wedding");
+    var currentMonth = monthKeyFor(tracker);
+    if(!currentMonth) return [];
     var currentYear = currentMonth.slice(0, 4);
     var forecast = [];
     
@@ -4299,18 +4317,32 @@
       shiftMonth(currentMonth, -1),
       currentMonth
     ];
-    var totals = months.map(function(m){ return Object.values(categoryTotals(tracker, m)).reduce(function(a,b){ return a + b; }, 0); });
-    var monthlyAvg = totals.length > 0 ? totals.reduce(function(a,b){ return a + b; }) / totals.length : 0;
+    
+    var monthlyTotals = [];
+    months.forEach(function(m){ 
+      var cats = categoryTotals(tracker, m);
+      if(Array.isArray(cats)){
+        var total = cats.reduce(function(sum, cat){ return sum + (Number(cat.spent) || 0); }, 0);
+        monthlyTotals.push(total);
+      }
+    });
+    
+    var monthlyAvg = monthlyTotals.length > 0 ? 
+      monthlyTotals.reduce(function(a,b){ return a + b; }, 0) / monthlyTotals.length : 0;
+    
+    var budgetTotal = getBudgetForTracker(tracker) || 0;
     
     // Project remaining months
     for(var i = 1; i <= 9; i++){
       var projMonth = shiftMonth(currentMonth, i);
       var projYear = projMonth.slice(0, 4);
       if(projYear === currentYear){
+        var totalSpentSoFar = monthlyAvg * (i - 1);
+        var remaining = Math.max(0, budgetTotal - totalSpentSoFar - monthlyAvg);
         forecast.push({
           month: monthLabel(projMonth),
           projected: monthlyAvg,
-          remaining: (getBudgetForTracker(tracker) || 0) - (monthlyAvg * i)
+          remaining: remaining
         });
       }
     }
