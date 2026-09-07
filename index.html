@@ -130,9 +130,17 @@
   }
   header.top{
     display: flex;
+    flex-direction: row;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 16px;
+    margin-bottom: 28px;
+  }
+  .header-left{
+    display: flex;
     flex-direction: column;
     gap: 4px;
-    margin-bottom: 28px;
+    flex: 1;
   }
   h1{
     font-family: "Fraunces", Georgia, serif;
@@ -146,6 +154,122 @@
     color: var(--text-secondary);
     font-size: 15px;
     margin: 0;
+  }
+
+  /* Google Auth UI */
+  .auth-section{
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 20px;
+    padding: 6px 8px;
+    font-size: 13.5px;
+  }
+  .auth-section.guest{
+    background: transparent;
+    border: none;
+    padding: 0;
+  }
+  .auth-profile-pic{
+    width: 28px;
+    height: 28px;
+    border-radius: 50%;
+    object-fit: cover;
+    cursor: pointer;
+    border: 1px solid var(--border);
+  }
+  .auth-user-info{
+    display: flex;
+    flex-direction: column;
+    gap: 0;
+    cursor: pointer;
+    min-width: 0;
+  }
+  .auth-user-name{
+    font-weight: 500;
+    color: var(--text-primary);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  .auth-user-email{
+    font-size: 11px;
+    color: var(--text-muted);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  .auth-menu{
+    position: relative;
+    display: inline-block;
+  }
+  .auth-menu-button{
+    appearance: none;
+    background: none;
+    border: none;
+    color: var(--text-muted);
+    cursor: pointer;
+    padding: 4px 2px;
+    font-size: 14px;
+    line-height: 1;
+  }
+  .auth-menu-button:hover{
+    color: var(--text-primary);
+  }
+  .auth-dropdown{
+    position: absolute;
+    top: 100%;
+    right: 0;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    box-shadow: var(--shadow);
+    min-width: 160px;
+    z-index: 1000;
+    display: none;
+  }
+  .auth-dropdown.open{
+    display: block;
+  }
+  .auth-dropdown-item{
+    display: block;
+    width: 100%;
+    padding: 10px 12px;
+    border: none;
+    background: none;
+    color: var(--text-primary);
+    text-align: left;
+    cursor: pointer;
+    font-family: "Work Sans", sans-serif;
+    font-size: 13px;
+    border-bottom: 1px solid var(--border);
+  }
+  .auth-dropdown-item:last-child{
+    border-bottom: none;
+  }
+  .auth-dropdown-item:hover{
+    background: var(--surface-2);
+  }
+  .auth-dropdown-item.danger{
+    color: var(--status-critical);
+  }
+  .sign-in-btn{
+    appearance: none;
+    background: var(--accent-personal);
+    border: none;
+    color: #fff;
+    font-family: "Work Sans", sans-serif;
+    font-weight: 500;
+    font-size: 13px;
+    padding: 7px 12px;
+    border-radius: 20px;
+    cursor: pointer;
+    white-space: nowrap;
+  }
+  .sign-in-btn:hover{
+    filter: brightness(1.08);
   }
 
   .tabs{
@@ -813,8 +937,13 @@
 
 <div class="page">
   <header class="top">
-    <h1>Budget Ledger</h1>
-    <p class="subtitle">Personal spending and wedding costs, tracked side by side.</p>
+    <div class="header-left">
+      <h1>Budget Ledger</h1>
+      <p class="subtitle">Personal spending and wedding costs, tracked side by side.</p>
+    </div>
+    <div class="auth-section guest" id="auth-section">
+      <button class="sign-in-btn" id="sign-in-btn">Sign In with Google</button>
+    </div>
   </header>
 
   <div id="save-banner"></div>
@@ -3417,14 +3546,26 @@
     if(!drive.tokenClient){
       drive.tokenClient = google.accounts.oauth2.initTokenClient({
         client_id: GOOGLE_CLIENT_ID,
-        scope: "https://www.googleapis.com/auth/drive.file",
+        scope: "https://www.googleapis.com/auth/drive.file openid email profile",
         callback: function(resp){
           if(!resp || resp.error){
             showBanner("Google Drive sign-in didn't go through.", { warn: true, action: "connect-drive", actionLabel: "↻ Try again" });
             return;
           }
           drive.accessToken = resp.access_token;
-          loadFromDrive();
+          // Fetch user info and save
+          fetch("https://www.googleapis.com/oauth2/v2/userinfo", {
+            headers: { Authorization: "Bearer " + resp.access_token }
+          }).then(function(res){ return res.json(); }).then(function(userInfo){
+            if(userInfo && !userInfo.error){
+              saveAuth(userInfo, resp.access_token);
+              renderAuthUI();
+            }
+            loadFromDrive();
+          }).catch(function(){
+            // Continue without saving user info
+            loadFromDrive();
+          });
         }
       });
     }
@@ -3595,9 +3736,175 @@
     window.claude.use("downloads").then(function(d){ if(d) state.downloads = d; }).catch(function(){});
   }
 
+  // ---------- Persistent Google Auth ----------
+
+  function getSavedAuth(){
+    var saved = localStorage.getItem("budgetLedgerAuth");
+    return saved ? JSON.parse(saved) : null;
+  }
+
+  function saveAuth(userInfo, accessToken){
+    localStorage.setItem("budgetLedgerAuth", JSON.stringify({
+      name: userInfo.name,
+      email: userInfo.email,
+      picture: userInfo.picture,
+      accessToken: accessToken,
+      timestamp: Date.now()
+    }));
+  }
+
+  function clearAuth(){
+    localStorage.removeItem("budgetLedgerAuth");
+    drive.accessToken = null;
+    drive.connected = false;
+  }
+
+  function renderAuthUI(){
+    var authSection = document.getElementById("auth-section");
+    var savedAuth = getSavedAuth();
+    
+    // Don't show placeholder if still loading
+    if(!authSection) return;
+    
+    if(savedAuth){
+      authSection.innerHTML = 
+        '<div class="auth-menu">' +
+        '  <div style="display: flex; align-items: center; gap: 8px; cursor: pointer;" id="auth-display">' +
+        '    <img class="auth-profile-pic" src="' + escapeHtml(savedAuth.picture) + '" alt="Profile">' +
+        '    <div class="auth-user-info" onclick="document.getElementById(\'auth-toggle\').click()">' +
+        '      <div class="auth-user-name">' + escapeHtml(savedAuth.name) + '</div>' +
+        '      <div class="auth-user-email">' + escapeHtml(savedAuth.email) + '</div>' +
+        '    </div>' +
+        '    <button id="auth-toggle" class="auth-menu-button" onclick="toggleAuthMenu(event)">⋮</button>' +
+        '  </div>' +
+        '  <div id="auth-dropdown" class="auth-dropdown">' +
+        '    <button class="auth-dropdown-item" onclick="switchAccount()">Switch Account</button>' +
+        '    <button class="auth-dropdown-item" onclick="reauthorizeDrive()">Reconnect Google Drive</button>' +
+        '    <button class="auth-dropdown-item danger" onclick="signOut()">Sign Out</button>' +
+        '  </div>' +
+        '</div>';
+      authSection.classList.remove("guest");
+      // Also show profile pic on click
+      document.getElementById("auth-display").addEventListener("click", function(){
+        document.getElementById("auth-toggle").click();
+      });
+    } else {
+      authSection.innerHTML = '<button class="sign-in-btn" id="sign-in-btn" onclick="initiateSignIn()">Sign In with Google</button>';
+      authSection.classList.add("guest");
+    }
+  }
+
+  function toggleAuthMenu(e){
+    e.stopPropagation();
+    var menu = document.getElementById("auth-dropdown");
+    if(menu.classList.contains("open")){
+      menu.classList.remove("open");
+    } else {
+      menu.classList.add("open");
+    }
+  }
+
+  function closeAuthMenu(){
+    var menu = document.getElementById("auth-dropdown");
+    if(menu && menu.classList.contains("open")){
+      menu.classList.remove("open");
+    }
+  }
+
+  function initiateSignIn(){
+    if(!window.google || !window.google.accounts) {
+      alert("Google Sign-In failed to load. Please refresh the page.");
+      return;
+    }
+    
+    window.google.accounts.oauth2.initCodeClient({
+      client_id: GOOGLE_CLIENT_ID,
+      scope: "openid email profile https://www.googleapis.com/auth/drive.file",
+      ux_mode: "popup",
+      callback: handleSignInCallback
+    }).requestCode();
+  }
+
+  function handleSignInCallback(response){
+    if(response.error){
+      console.error("Sign-in error:", response.error);
+      alert("Sign-in failed: " + response.error);
+      return;
+    }
+    
+    // Exchange code for token
+    fetch("https://oauth2.googleapis.com/token", {
+      method: "POST",
+      headers: { "Content-Type": "application/x-www-form-urlencoded" },
+      body: new URLSearchParams({
+        code: response.code,
+        client_id: GOOGLE_CLIENT_ID,
+        grant_type: "authorization_code",
+        redirect_uri: window.location.origin + window.location.pathname
+      })
+    }).then(function(r){ return r.json(); }).then(function(data){
+      if(data.error){
+        alert("Token exchange failed: " + data.error);
+        return;
+      }
+      drive.accessToken = data.access_token;
+      
+      // Get user info
+      return fetch("https://www.googleapis.com/oauth2/v2/userinfo", {
+        headers: { Authorization: "Bearer " + data.access_token }
+      }).then(function(r){ return r.json(); }).then(function(userInfo){
+        if(userInfo.error){
+          alert("Could not fetch user info: " + userInfo.error);
+          return;
+        }
+        saveAuth(userInfo, data.access_token);
+        renderAuthUI();
+        closeAuthMenu();
+        loadFromDrive();
+      });
+    }).catch(function(err){
+      console.error("Auth error:", err);
+      alert("Authentication failed. Please try again.");
+    });
+  }
+
+  function switchAccount(){
+    closeAuthMenu();
+    clearAuth();
+    renderAuthUI();
+    initiateSignIn();
+  }
+
+  function signOut(){
+    closeAuthMenu();
+    clearAuth();
+    renderAuthUI();
+    drive.connected = false;
+    state.budgets.personal = DEFAULT_BUDGETS.personal;
+    state.budgets.wedding = DEFAULT_BUDGETS.wedding;
+    showBanner("Signed out. Your data was not deleted. Sign in again to sync.", { warn: true, action: "connect-drive", actionLabel: "🔗 Sign In with Google" });
+    render();
+  }
+
+  function reauthorizeDrive(){
+    closeAuthMenu();
+    var savedAuth = getSavedAuth();
+    if(!savedAuth){
+      initiateSignIn();
+      return;
+    }
+    connectDrive();
+  }
+
+  // Close auth menu when clicking outside
+  document.addEventListener("click", function(){
+    closeAuthMenu();
+  });
+
   function init(){
     state.budgets.personal = DEFAULT_BUDGETS.personal;
     state.budgets.wedding = DEFAULT_BUDGETS.wedding;
+    renderAuthUI();
     render();
     initSample();
     initDownloads();
@@ -3607,7 +3914,14 @@
       return;
     }
 
-    showBanner("Connect Google Drive to load and save your data.", { action: "connect-drive", actionLabel: "🔗 Connect Google Drive" });
+    var savedAuth = getSavedAuth();
+    if(savedAuth){
+      drive.accessToken = savedAuth.accessToken;
+      showBanner("Loading your data from Google Drive…");
+      loadFromDrive();
+    } else {
+      showBanner("Connect Google Drive to load and save your data.", { action: "connect-drive", actionLabel: "🔗 Connect Google Drive" });
+    }
   }
 
   init();
