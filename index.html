@@ -1891,30 +1891,32 @@
     html += '  </div>';
     html += '</section>';
 
-    // Add forecast section
-    html += renderForecastSection(tracker) || "";
+    if(tracker !== "wedding"){
+      // Add forecast section
+      html += renderForecastSection(tracker) || "";
 
-    // Add year-over-year if data available
-    try{
-      var yoyComparison = getYoYComparison(tracker, monthKey);
-      if(yoyComparison && Object.keys(yoyComparison).length > 0){
-        html += '<section><div class="section-head"><div class="section-title">📈 vs Last Year</div></div>';
-        html += '<div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px;">';
-        Object.keys(yoyComparison).slice(0, 4).forEach(function(cat){
-          var data = yoyComparison[cat];
-          if(data && !isNaN(data.current) && !isNaN(data.previous)){
-            html += '<div class="card" style="padding: 12px 14px;"><div style="font-size: 12px; color: var(--text-secondary); margin-bottom: 4px;">' + escapeHtml(cat) + '</div>';
-            html += '<div class="yoy-comparison">';
-            html += '<div class="yoy-item"><div class="yoy-label">This year</div><div class="yoy-value">' + currency.format(data.current) + '</div></div>';
-            html += '<div class="yoy-item"><div class="yoy-label">Last year</div><div class="yoy-value">' + currency.format(data.previous) + '</div></div>';
-            html += '</div>';
-            html += '<div class="yoy-change ' + (data.pctChange > 0 ? 'up' : data.pctChange < 0 ? 'down' : '') + '">' + (data.pctChange > 0 ? '+' : '') + data.pctChange + '%</div>';
-            html += '</div>';
-          }
-        });
-        html += '</div></section>';
-      }
-    }catch(e){ console.log("YoY error", e); }
+      // Add year-over-year if data available
+      try{
+        var yoyComparison = getYoYComparison(tracker, monthKey);
+        if(yoyComparison && Object.keys(yoyComparison).length > 0){
+          html += '<section><div class="section-head"><div class="section-title">📈 vs Last Year</div></div>';
+          html += '<div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px;">';
+          Object.keys(yoyComparison).slice(0, 4).forEach(function(cat){
+            var data = yoyComparison[cat];
+            if(data && !isNaN(data.current) && !isNaN(data.previous)){
+              html += '<div class="card" style="padding: 12px 14px;"><div style="font-size: 12px; color: var(--text-secondary); margin-bottom: 4px;">' + escapeHtml(cat) + '</div>';
+              html += '<div class="yoy-comparison">';
+              html += '<div class="yoy-item"><div class="yoy-label">This year</div><div class="yoy-value">' + currency.format(data.current) + '</div></div>';
+              html += '<div class="yoy-item"><div class="yoy-label">Last year</div><div class="yoy-value">' + currency.format(data.previous) + '</div></div>';
+              html += '</div>';
+              html += '<div class="yoy-change ' + (data.pctChange > 0 ? 'up' : data.pctChange < 0 ? 'down' : '') + '">' + (data.pctChange > 0 ? '+' : '') + data.pctChange + '%</div>';
+              html += '</div>';
+            }
+          });
+          html += '</div></section>';
+        }
+      }catch(e){ console.log("YoY error", e); }
+    }
 
     return html;
   }
