@@ -397,6 +397,27 @@
     color: var(--status-critical);
   }
 
+  /* Change Log */
+  .changelog-card{
+    padding: 4px 16px;
+  }
+  .changelog-row{
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    gap: 12px;
+    padding: 10px 0;
+    border-bottom: 1px solid var(--border);
+  }
+  .changelog-row:last-child{ border-bottom: none; }
+  .changelog-summary{ font-size: 13px; color: var(--text-primary); }
+  .changelog-meta{
+    font-size: 11px;
+    color: var(--text-muted);
+    white-space: nowrap;
+    text-align: right;
+  }
+
   /* Year-over-Year */
   .yoy-comparison{
     display: grid;
@@ -1093,6 +1114,7 @@
     <div class="header-left">
       <h1>Budget Ledger</h1>
       <p class="subtitle">Personal spending and wedding costs, tracked side by side.</p>
+      <p class="subtitle" id="last-change-subtitle" style="margin-top:2px"></p>
     </div>
     <div class="auth-section guest" id="auth-section">
       <button class="sign-in-btn" id="sign-in-btn">Sign In with Google</button>
@@ -1158,6 +1180,7 @@
       categories: [
         { name: "Housing", budget: 1800, subcategories: ["Rent/Mortgage", "Property Tax", "HOA Fees", "Home Maintenance", "Home Insurance"] },
         { name: "Groceries", budget: 500, subcategories: ["Supermarket", "Warehouse Club", "Specialty/Butcher", "Farmers Market"] },
+        { name: "Food & Drink", budget: 300, subcategories: ["Restaurant", "Bar", "Coffee", "Fast Food", "Delivery/Takeout", "Happy Hour"] },
         { name: "Transportation", budget: 300, subcategories: ["Gas", "Car Payment", "Car Insurance", "Maintenance & Repairs", "Parking & Tolls", "Public Transit", "Rideshare"] },
         { name: "Utilities", budget: 200, subcategories: ["Electric", "Gas/Heating", "Water & Sewer", "Trash", "Internet", "Cell Phone"] },
         { name: "Insurance", budget: 150, subcategories: ["Health Insurance", "Life Insurance", "Renters/Home Insurance", "Disability Insurance"] },
@@ -1246,7 +1269,8 @@
     syncErrors: [],
     savingsGoals: { items: [] },
     isOnline: navigator.onLine,
-    overBudgetCategories: { personal: [], wedding: [] }
+    overBudgetCategories: { personal: [], wedding: [] },
+    changeLog: []
   };
 
   function uid(prefix){
@@ -1543,12 +1567,23 @@
   function render(){
     updateOverBudgetCategories();
     renderTabs();
+    renderLastChangeSubtitle();
     ["personal", "wedding"].forEach(function(t){
       var panel = document.getElementById(t + "-panel");
       panel.hidden = state.tracker !== t;
     });
     renderPanel(state.tracker);
     renderEditModalMount();
+  }
+
+  function renderLastChangeSubtitle(){
+    var el = document.getElementById("last-change-subtitle");
+    if(!el) return;
+    var last = (state.changeLog || [])[0];
+    if(!last){ el.textContent = ""; return; }
+    var d = new Date(last.at);
+    var when = isNaN(d.getTime()) ? "" : d.toLocaleString(undefined, { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" });
+    el.textContent = "Last change: " + last.summary + " — " + last.by + (when ? ", " + when : "");
   }
 
   function renderEditModalMount(){
@@ -2241,7 +2276,30 @@
     html += renderCategoriesManageSection(tracker);
     html += renderPaymentMethodsSection();
     if(tracker === "wedding") html += renderVendorsSection();
+    html += renderChangeLogSection(tracker);
     html += renderDataSection();
+    return html;
+  }
+
+  function renderChangeLogSection(tracker){
+    var entries = (state.changeLog || []).filter(function(c){ return c.tracker === tracker; }).slice(0, 20);
+    var html = '<section>';
+    html += '  <div class="section-head"><span class="section-title">🕓 Change Log</span><span class="section-hint">Last ' + entries.length + ' change' + (entries.length === 1 ? '' : 's') + '</span></div>';
+    html += '  <div class="card changelog-card">';
+    if(entries.length === 0){
+      html += '<div class="empty-note">No changes logged yet — additions and edits will show up here.</div>';
+    } else {
+      entries.forEach(function(c){
+        var d = new Date(c.at);
+        var when = isNaN(d.getTime()) ? "" : d.toLocaleString(undefined, { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" });
+        html += '<div class="changelog-row">';
+        html += '  <div class="changelog-summary">' + escapeHtml(c.summary) + '</div>';
+        html += '  <div class="changelog-meta">' + escapeHtml(c.by) + '<br>' + escapeHtml(when) + '</div>';
+        html += '</div>';
+      });
+    }
+    html += '  </div>';
+    html += '</section>';
     return html;
   }
 
@@ -3117,6 +3175,7 @@
       return c.name === name ? { name: c.name, budget: newVal, subcategories: c.subcategories || [] } : c;
     });
     state.editingCategory = null;
+    recordChange(tracker, "Set " + name + " budget to " + currencyPrecise.format(newVal));
     saveBudget(tracker, categories, doc.hint);
   }
 
@@ -3125,6 +3184,7 @@
     var exists = (doc.categories || []).some(function(c){ return c.name.toLowerCase() === name.toLowerCase(); });
     if(exists) return;
     var categories = (doc.categories || []).concat([{ name: name, budget: 0, subcategories: [] }]);
+    recordChange(tracker, "Added category \"" + name + "\"");
     saveBudget(tracker, categories, doc.hint);
   }
 
@@ -3139,6 +3199,7 @@
       subs.push(subName);
       return { name: c.name, budget: c.budget, subcategories: subs };
     });
+    recordChange(tracker, "Added subcategory \"" + subName + "\" to " + categoryName);
     saveBudget(tracker, categories, doc.hint);
   }
 
@@ -3149,6 +3210,7 @@
       var subs = (c.subcategories || []).filter(function(s){ return s !== subName; });
       return { name: c.name, budget: c.budget, subcategories: subs };
     });
+    recordChange(tracker, "Removed subcategory \"" + subName + "\" from " + categoryName);
     saveBudget(tracker, categories, doc.hint);
   }
 
@@ -3294,6 +3356,17 @@
 
   var localIdCounter = 1;
 
+  function currentUserName(){
+    var auth = getSavedAuth();
+    return (auth && auth.name) ? auth.name.split(" ")[0] : "You";
+  }
+
+  function recordChange(tracker, summary){
+    if(!state.changeLog) state.changeLog = [];
+    state.changeLog.unshift({ at: new Date().toISOString(), by: currentUserName(), tracker: tracker, summary: summary });
+    if(state.changeLog.length > 20) state.changeLog.length = 20;
+  }
+
   function saveBudget(tracker, categories, hint){
     var payload = { categories: categories, hint: hint || (DEFAULT_BUDGETS[tracker] && DEFAULT_BUDGETS[tracker].hint) || "", updatedAt: new Date().toISOString() };
     state.budgets[tracker] = payload;
@@ -3307,6 +3380,9 @@
       applyVendorPaymentAmount(expense.vendorId, Number(expense.amount) || 0);
     }
     state.expenses.unshift(Object.assign({ id: uid("exp") }, expense));
+    var summary = "Logged " + currencyPrecise.format(Number(expense.amount) || 0) + " expense in " + (expense.category || "Other");
+    if(expense.note) summary += " (" + expense.note + ")";
+    recordChange(expense.tracker, summary);
     schedulePersist();
   }
 
@@ -3318,7 +3394,11 @@
   }
 
   function deleteExpense(id){
+    var removed = state.expenses.find(function(e){ return e.id === id; });
     state.expenses = state.expenses.filter(function(e){ return e.id !== id; });
+    if(removed){
+      recordChange(removed.tracker, "Deleted " + currencyPrecise.format(Number(removed.amount) || 0) + " expense in " + (removed.category || "Other"));
+    }
     render();
     schedulePersist();
   }
@@ -3344,6 +3424,7 @@
 
     state.expenses[idx] = updated;
     state.editingExpense = null;
+    recordChange(updated.tracker, "Edited expense in " + (updated.category || "Other") + " (" + currencyPrecise.format(Number(updated.amount) || 0) + ")");
     render();
     schedulePersist();
   }
@@ -3371,11 +3452,14 @@
   function addSubscription(tracker, sub){
     sub.id = uid("sub");
     state.subscriptions[tracker].items = (state.subscriptions[tracker].items || []).concat([sub]);
+    recordChange(tracker, "Added subscription \"" + sub.name + "\"");
     saveSubscriptions(tracker);
   }
 
   function removeSubscription(tracker, id){
+    var removed = (state.subscriptions[tracker].items || []).find(function(s){ return s.id === id; });
     state.subscriptions[tracker].items = (state.subscriptions[tracker].items || []).filter(function(s){ return s.id !== id; });
+    if(removed) recordChange(tracker, "Removed subscription \"" + removed.name + "\"");
     saveSubscriptions(tracker);
   }
 
@@ -3406,11 +3490,14 @@
   function addIncome(tracker, item){
     item.id = uid("inc");
     state.income[tracker].items = (state.income[tracker].items || []).concat([item]);
+    recordChange(tracker, "Logged " + currencyPrecise.format(Number(item.amount) || 0) + " income from " + (item.source || "unknown source"));
     saveIncome(tracker);
   }
 
   function removeIncome(tracker, id){
+    var removed = (state.income[tracker].items || []).find(function(i){ return i.id === id; });
     state.income[tracker].items = (state.income[tracker].items || []).filter(function(i){ return i.id !== id; });
+    if(removed) recordChange(tracker, "Removed " + currencyPrecise.format(Number(removed.amount) || 0) + " income from " + (removed.source || "unknown source"));
     saveIncome(tracker);
   }
 
@@ -3492,11 +3579,14 @@
   function addVendor(v){
     v.id = uid("vendor");
     state.vendors.wedding.items = (state.vendors.wedding.items || []).concat([v]);
+    recordChange("wedding", "Added vendor \"" + v.name + "\"");
     saveVendors();
   }
 
   function removeVendor(id){
+    var removed = (state.vendors.wedding.items || []).find(function(v){ return v.id === id; });
     state.vendors.wedding.items = (state.vendors.wedding.items || []).filter(function(v){ return v.id !== id; });
+    if(removed) recordChange("wedding", "Removed vendor \"" + removed.name + "\"");
     saveVendors();
   }
 
@@ -3547,7 +3637,8 @@
       recurringIncome: state.recurringIncome,
       salarySetup: state.salarySetup,
       vendors: state.vendors,
-      savingsGoals: state.savingsGoals
+      savingsGoals: state.savingsGoals,
+      changeLog: state.changeLog
     };
   }
 
@@ -3865,6 +3956,8 @@
     
     state.savingsGoals = data.savingsGoals || { items: [] };
     if(!state.savingsGoals.items) state.savingsGoals.items = [];
+
+    state.changeLog = Array.isArray(data.changeLog) ? data.changeLog.slice(0, 20) : [];
   }
 
   function loadFromDrive(){
@@ -4008,18 +4101,20 @@
     }
   }
 
-  function initiateSignIn(){
+  function initiateSignIn(forceAccountChooser){
     if(!window.google || !window.google.accounts) {
       alert("Google Sign-In failed to load. Please refresh the page.");
       return;
     }
-    
-    window.google.accounts.oauth2.initCodeClient({
+
+    var config = {
       client_id: GOOGLE_CLIENT_ID,
       scope: "openid email profile https://www.googleapis.com/auth/drive.file",
       ux_mode: "popup",
       callback: handleSignInCallback
-    }).requestCode();
+    };
+    if(forceAccountChooser) config.prompt = "select_account";
+    window.google.accounts.oauth2.initCodeClient(config).requestCode();
   }
 
   function handleSignInCallback(response){
@@ -4069,7 +4164,7 @@
     closeAuthMenu();
     clearAuth();
     renderAuthUI();
-    initiateSignIn();
+    initiateSignIn(true);
   }
 
   function signOut(){
@@ -4192,12 +4287,15 @@
     goal.id = uid("goal");
     goal.createdAt = todayStr();
     state.savingsGoals.items.push(goal);
+    recordChange("personal", "Added savings goal \"" + goal.name + "\"");
     saveSavingsGoals();
   }
 
   function removeSavingsGoal(id){
     if(!state.savingsGoals || !state.savingsGoals.items) return;
+    var removed = state.savingsGoals.items.find(function(g){ return g.id === id; });
     state.savingsGoals.items = state.savingsGoals.items.filter(function(g){ return g.id !== id; });
+    if(removed) recordChange("personal", "Removed savings goal \"" + removed.name + "\"");
     saveSavingsGoals();
   }
 
