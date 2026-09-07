@@ -1,0 +1,3617 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Budget Ledger</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,500;9..144,600&family=Work+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<script src="https://accounts.google.com/gsi/client" async defer></script>
+<style>
+  :root{
+    color-scheme: light;
+    --bg: #f7f2e9;
+    --surface: #ffffff;
+    --surface-2: #fbf7ef;
+    --text-primary: #221d15;
+    --text-secondary: #6e6656;
+    --text-muted: #9a9280;
+    --border: rgba(34,29,21,0.12);
+    --border-strong: rgba(34,29,21,0.20);
+
+    --accent-personal: #2f6f62;
+    --accent-personal-soft: rgba(47,111,98,0.12);
+    --accent-wedding: #a8552f;
+    --accent-wedding-soft: rgba(168,85,47,0.12);
+
+    --status-good: #0ca30c;
+    --status-warning-bg: #fab219;
+    --status-warning-text: #7a5200;
+    --status-critical: #d03b3b;
+
+    --chart-expense: #ab5c49;
+    --chart-income: #5c8567;
+
+    --series-1: #2a78d6;
+    --series-2: #eb6834;
+    --series-3: #1baf7a;
+    --series-4: #b8860a;
+    --series-5: #d0568a;
+    --series-6: #008300;
+    --series-7: #4a3aa7;
+    --series-8: #e34948;
+
+    --shadow: 0 1px 2px rgba(34,29,21,0.06), 0 8px 24px -12px rgba(34,29,21,0.18);
+  }
+  @media (prefers-color-scheme: dark){
+    :root:not([data-theme="light"]){
+      color-scheme: dark;
+      --bg: #16130e;
+      --surface: #201b14;
+      --surface-2: #262019;
+      --text-primary: #f4efe4;
+      --text-secondary: #c7bea9;
+      --text-muted: #8f8672;
+      --border: rgba(244,239,228,0.12);
+      --border-strong: rgba(244,239,228,0.22);
+
+      --accent-personal: #59a892;
+      --accent-personal-soft: rgba(89,168,146,0.16);
+      --accent-wedding: #dd8a63;
+      --accent-wedding-soft: rgba(221,138,99,0.16);
+
+      --status-good: #37c23a;
+      --status-warning-bg: #c98500;
+      --status-warning-text: #fbe1ad;
+      --status-critical: #e66767;
+
+      --chart-expense: #c98a78;
+      --chart-income: #85ac90;
+
+      --series-1: #3987e5;
+      --series-2: #d95926;
+      --series-3: #199e70;
+      --series-4: #c98500;
+      --series-5: #d55181;
+      --series-6: #2fae2f;
+      --series-7: #9085e9;
+      --series-8: #e66767;
+
+      --shadow: 0 1px 2px rgba(0,0,0,0.3), 0 8px 24px -12px rgba(0,0,0,0.5);
+    }
+  }
+  :root[data-theme="dark"]{
+    color-scheme: dark;
+    --bg: #16130e;
+    --surface: #201b14;
+    --surface-2: #262019;
+    --text-primary: #f4efe4;
+    --text-secondary: #c7bea9;
+    --text-muted: #8f8672;
+    --border: rgba(244,239,228,0.12);
+    --border-strong: rgba(244,239,228,0.22);
+
+    --accent-personal: #59a892;
+    --accent-personal-soft: rgba(89,168,146,0.16);
+    --accent-wedding: #dd8a63;
+    --accent-wedding-soft: rgba(221,138,99,0.16);
+
+    --status-good: #37c23a;
+    --status-warning-bg: #c98500;
+    --status-warning-text: #fbe1ad;
+    --status-critical: #e66767;
+
+    --chart-expense: #c98a78;
+    --chart-income: #85ac90;
+
+    --series-1: #3987e5;
+    --series-2: #d95926;
+    --series-3: #199e70;
+    --series-4: #c98500;
+    --series-5: #d55181;
+    --series-6: #2fae2f;
+    --series-7: #9085e9;
+    --series-8: #e66767;
+
+    --shadow: 0 1px 2px rgba(0,0,0,0.3), 0 8px 24px -12px rgba(0,0,0,0.5);
+  }
+
+  *{ box-sizing: border-box; }
+  body{
+    background: var(--bg);
+    color: var(--text-primary);
+    font-family: "Work Sans", system-ui, -apple-system, sans-serif;
+    font-size: 15px;
+    line-height: 1.5;
+  }
+  .page{
+    max-width: 900px;
+    margin: 0 auto;
+    padding: 40px 24px 80px;
+  }
+  header.top{
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    margin-bottom: 28px;
+  }
+  h1{
+    font-family: "Fraunces", Georgia, serif;
+    font-weight: 600;
+    font-size: 34px;
+    letter-spacing: -0.01em;
+    margin: 0;
+    text-wrap: balance;
+  }
+  .subtitle{
+    color: var(--text-secondary);
+    font-size: 15px;
+    margin: 0;
+  }
+
+  .tabs{
+    display: flex;
+    gap: 4px;
+    border-bottom: 1px solid var(--border);
+    margin-bottom: 20px;
+  }
+  .tab{
+    appearance: none;
+    background: none;
+    border: none;
+    font-family: "Fraunces", Georgia, serif;
+    font-size: 17px;
+    font-weight: 500;
+    color: var(--text-muted);
+    padding: 10px 4px 12px;
+    margin-right: 22px;
+    cursor: pointer;
+    border-bottom: 2px solid transparent;
+    transform: translateY(1px);
+  }
+  .tab:hover{ color: var(--text-primary); }
+  .tab.active{ color: var(--text-primary); }
+  .tab[data-tracker="personal"].active{ border-bottom-color: var(--accent-personal); }
+  .tab[data-tracker="wedding"].active{ border-bottom-color: var(--accent-wedding); }
+
+  .subnav{ display: flex; gap: 6px; margin-bottom: 24px; flex-wrap: wrap; }
+  .subnav-btn{
+    appearance: none;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    color: var(--text-secondary);
+    font-family: "Work Sans", sans-serif;
+    font-size: 13px;
+    font-weight: 500;
+    padding: 7px 14px;
+    border-radius: 100px;
+    cursor: pointer;
+  }
+  .subnav-btn:hover{ color: var(--text-primary); border-color: var(--border-strong); }
+  .subnav-btn.active{ color: #fff; border-color: transparent; }
+  #personal-panel .subnav-btn.active{ background: var(--accent-personal); }
+  #wedding-panel .subnav-btn.active{ background: var(--accent-wedding); }
+
+  .back-link{
+    appearance: none;
+    background: none;
+    border: none;
+    color: var(--text-secondary);
+    font-family: "Work Sans", sans-serif;
+    font-size: 13.5px;
+    font-weight: 500;
+    cursor: pointer;
+    padding: 0;
+    margin-bottom: 20px;
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+  }
+  .back-link:hover{ color: var(--text-primary); }
+
+  section{ margin-bottom: 28px; }
+  .section-head{
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    margin-bottom: 12px;
+    gap: 12px;
+    flex-wrap: wrap;
+  }
+  .section-title{
+    font-family: "Fraunces", Georgia, serif;
+    font-weight: 500;
+    font-size: 15px;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    color: var(--text-secondary);
+  }
+  .section-hint{
+    font-size: 13px;
+    color: var(--text-muted);
+  }
+
+  .month-switch{
+    display: inline-flex;
+    align-items: center;
+    gap: 10px;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 100px;
+    padding: 5px 6px 5px 14px;
+    font-size: 13.5px;
+    font-weight: 500;
+  }
+  .month-switch button{
+    appearance: none;
+    background: var(--surface-2);
+    border: 1px solid var(--border);
+    color: var(--text-primary);
+    width: 24px; height: 24px;
+    border-radius: 50%;
+    cursor: pointer;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 13px;
+    line-height: 1;
+  }
+  .month-switch button:hover{ background: var(--border); }
+
+  .stat-row{
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 12px;
+  }
+  .stat-tile{
+    min-width: 0;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 16px 18px;
+    box-shadow: var(--shadow);
+  }
+  .stat-label{
+    font-size: 12px;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    color: var(--text-muted);
+    margin-bottom: 6px;
+  }
+  .stat-value{
+    font-family: "IBM Plex Mono", monospace;
+    font-variant-numeric: tabular-nums;
+    font-size: 24px;
+    font-weight: 500;
+    letter-spacing: -0.01em;
+    overflow-wrap: break-word;
+  }
+  .status-chip{
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    margin-top: 8px;
+    font-size: 12.5px;
+    font-weight: 500;
+    padding: 3px 9px 3px 7px;
+    border-radius: 100px;
+  }
+  .status-chip .dot{ width: 7px; height: 7px; border-radius: 50%; flex: none; }
+  .status-chip.good{ background: color-mix(in srgb, var(--status-good) 16%, transparent); color: var(--status-good); }
+  .status-chip.good .dot{ background: var(--status-good); }
+  .status-chip.warning{ background: color-mix(in srgb, var(--status-warning-bg) 22%, transparent); color: var(--status-warning-text); }
+  .status-chip.warning .dot{ background: var(--status-warning-bg); }
+  .status-chip.critical{ background: color-mix(in srgb, var(--status-critical) 16%, transparent); color: var(--status-critical); }
+  .status-chip.critical .dot{ background: var(--status-critical); }
+
+  .card{
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    box-shadow: var(--shadow);
+  }
+
+  /* Payment-type mini tiles */
+  .ptype-row{ display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; }
+  .ptype-tile{
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 12px 14px;
+    box-shadow: var(--shadow);
+  }
+  .ptype-tile .ptype-label{
+    display: flex; align-items: center; gap: 6px;
+    font-size: 11.5px; text-transform: uppercase; letter-spacing: 0.05em;
+    color: var(--text-muted); margin-bottom: 6px;
+  }
+  .ptype-tile .ptype-label .swatch{ width: 7px; height: 7px; border-radius: 50%; flex: none; }
+  .ptype-tile .ptype-value{ font-family: "IBM Plex Mono", monospace; font-variant-numeric: tabular-nums; font-size: 16px; font-weight: 500; }
+
+  /* Category breakdown (clickable on dashboard) */
+  .cat-list{ display: flex; flex-direction: column; }
+  .cat-row{
+    display: grid;
+    grid-template-columns: 150px 1fr 128px 28px;
+    align-items: center;
+    gap: 14px;
+    padding: 12px 16px;
+    border-bottom: 1px solid var(--border);
+  }
+  .cat-row:last-child{ border-bottom: none; }
+  .cat-row.clickable{ cursor: pointer; grid-template-columns: 150px 1fr 128px 16px; }
+  .cat-row.clickable:hover{ background: var(--surface-2); }
+  .cat-name{
+    display: flex;
+    align-items: flex-start;
+    gap: 8px;
+    font-size: 14px;
+    font-weight: 500;
+    min-width: 0;
+  }
+  .cat-name .swatch{ width: 9px; height: 9px; border-radius: 50%; flex: none; margin-top: 2px; }
+  .cat-name span{ overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .cat-name-inner{ display: flex; flex-direction: column; align-items: flex-start; gap: 3px; min-width: 0; }
+  .cat-chevron{ color: var(--text-muted); font-size: 15px; text-align: right; }
+  .bar-track{
+    position: relative;
+    height: 8px;
+    border-radius: 100px;
+    background: var(--surface-2);
+    border: 1px solid var(--border);
+    overflow: hidden;
+  }
+  .bar-fill{
+    position: absolute;
+    inset: 0 auto 0 0;
+    border-radius: 100px;
+  }
+  .cat-amounts{
+    font-family: "IBM Plex Mono", monospace;
+    font-variant-numeric: tabular-nums;
+    font-size: 13px;
+    text-align: right;
+    color: var(--text-secondary);
+    white-space: nowrap;
+  }
+  .cat-amounts b{ color: var(--text-primary); font-weight: 500; }
+  .cat-amounts.over b{ color: var(--status-critical); }
+  .edit-budget-btn{
+    appearance: none;
+    background: none;
+    border: none;
+    color: var(--text-muted);
+    cursor: pointer;
+    width: 24px;
+    height: 24px;
+    border-radius: 6px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+  .edit-budget-btn:hover{ background: var(--surface-2); color: var(--text-primary); }
+  .budget-edit-input{
+    width: 100%;
+    font-family: "IBM Plex Mono", monospace;
+    font-size: 13px;
+    text-align: right;
+    background: var(--surface-2);
+    border: 1px solid var(--border-strong);
+    border-radius: 6px;
+    padding: 4px 6px;
+    color: var(--text-primary);
+  }
+
+  .add-category-form{ display: flex; gap: 8px; padding: 12px 16px; flex-wrap: wrap; }
+  .add-category-form input{
+    flex: 1 1 200px;
+    font-family: "Work Sans", sans-serif;
+    font-size: 13.5px;
+    background: var(--surface-2);
+    border: 1px solid var(--border-strong);
+    border-radius: 7px;
+    padding: 7px 10px;
+    color: var(--text-primary);
+  }
+  .ghost-btn{
+    appearance: none;
+    background: none;
+    border: 1px dashed var(--border-strong);
+    color: var(--text-secondary);
+    font-family: "Work Sans", sans-serif;
+    font-size: 13px;
+    padding: 6px 12px;
+    border-radius: 100px;
+    cursor: pointer;
+  }
+  .ghost-btn:hover{ color: var(--text-primary); border-color: var(--text-muted); }
+
+  /* Payment methods */
+  .pm-body{ padding: 14px 16px; display: flex; flex-direction: column; gap: 12px; }
+  .pm-list{ display: flex; flex-wrap: wrap; gap: 8px; }
+  .pm-chip{
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    background: var(--surface-2);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 7px 10px;
+    font-size: 13px;
+  }
+  .pm-chip .pm-name{ font-weight: 500; }
+  .pm-chip .pm-last4{ color: var(--text-muted); font-family: "IBM Plex Mono", monospace; font-size: 12px; }
+  .pm-chip .pm-total{ color: var(--text-muted); font-family: "IBM Plex Mono", monospace; font-size: 11.5px; padding-left: 4px; border-left: 1px solid var(--border); margin-left: 2px; }
+  .pm-chip .pm-remove{
+    appearance: none; background: none; border: none; color: var(--text-muted);
+    cursor: pointer; font-size: 11px; padding: 0 0 0 2px;
+  }
+  .pm-chip .pm-remove:hover{ color: var(--status-critical); }
+  .pm-empty{ color: var(--text-muted); font-size: 13px; }
+  .pm-add-form{ display: flex; flex-wrap: wrap; gap: 8px; align-items: end; }
+  .pm-add-form .field{ flex: 1 1 140px; }
+  .pm-add-form .field.narrow{ flex: 0 1 90px; }
+
+  /* Subcategories */
+  .subcat-toggle{
+    appearance: none;
+    background: none;
+    border: 1px solid var(--border);
+    color: var(--text-muted);
+    font-family: "Work Sans", sans-serif;
+    font-size: 11px;
+    padding: 2px 8px;
+    border-radius: 100px;
+    cursor: pointer;
+    flex: none;
+  }
+  .subcat-toggle:hover{ color: var(--text-primary); border-color: var(--text-muted); }
+  .cat-subrow{
+    padding: 10px 16px 14px;
+    background: var(--surface-2);
+    border-bottom: 1px solid var(--border);
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+  }
+  .subcat-chip-row{ display: flex; flex-wrap: wrap; gap: 8px; }
+  .subcat-chip{
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 100px;
+    padding: 4px 6px 4px 10px;
+    font-size: 12.5px;
+  }
+  .subcat-chip-remove{
+    appearance: none; background: none; border: none; color: var(--text-muted);
+    cursor: pointer; font-size: 10px; padding: 2px;
+  }
+  .subcat-chip-remove:hover{ color: var(--status-critical); }
+  .subcat-add-inline{ display: flex; flex-wrap: wrap; gap: 8px; }
+  .subcat-add-inline input{
+    flex: 1 1 160px;
+    font-family: "Work Sans", sans-serif;
+    font-size: 13px;
+    background: var(--surface);
+    border: 1px solid var(--border-strong);
+    border-radius: 7px;
+    padding: 7px 10px;
+    color: var(--text-primary);
+  }
+
+  form.entry-form{
+    display: flex;
+    flex-wrap: wrap;
+    align-items: end;
+    gap: 10px;
+    padding: 16px;
+  }
+  form.entry-form .field{ flex: 1 1 120px; min-width: 0; }
+  form.entry-form .field.note-field{ flex: 1 1 160px; }
+  .field label{
+    display: block;
+    font-size: 11.5px;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    color: var(--text-muted);
+    margin-bottom: 5px;
+  }
+  .field select, .field input{
+    width: 100%;
+    font-family: "Work Sans", sans-serif;
+    font-size: 14px;
+    background: var(--surface-2);
+    border: 1px solid var(--border-strong);
+    border-radius: 7px;
+    padding: 8px 10px;
+    color: var(--text-primary);
+  }
+  .field input[type="number"]{ font-family: "IBM Plex Mono", monospace; }
+  .submit-btn{
+    align-self: end;
+    font-family: "Work Sans", sans-serif;
+    font-weight: 600;
+    font-size: 14px;
+    color: #fff;
+    border: none;
+    border-radius: 7px;
+    padding: 9px 16px;
+    cursor: pointer;
+    white-space: nowrap;
+  }
+  #personal-panel .submit-btn{ background: var(--accent-personal); }
+  #wedding-panel .submit-btn{ background: var(--accent-wedding); }
+  .submit-btn:hover{ filter: brightness(1.08); }
+  .submit-btn.neutral{ background: var(--text-primary) !important; }
+
+  .scan-row{ padding: 14px 16px 0; }
+  .scan-btn{
+    appearance: none;
+    width: 100%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    background: var(--surface-2);
+    border: 1px dashed var(--border-strong);
+    color: var(--text-secondary);
+    font-family: "Work Sans", sans-serif;
+    font-size: 13.5px;
+    font-weight: 500;
+    padding: 10px 14px;
+    border-radius: 8px;
+    cursor: pointer;
+  }
+  .scan-btn:hover{ color: var(--text-primary); border-color: var(--text-muted); }
+  .scan-btn:disabled{ opacity: 0.6; cursor: default; }
+  .receipt-preview{ padding: 10px 16px 0; display: flex; align-items: center; gap: 10px; }
+  .receipt-preview:empty{ display: none; }
+  .receipt-thumb{
+    width: 40px; height: 40px; object-fit: cover; border-radius: 7px;
+    border: 1px solid var(--border); display: block; cursor: zoom-in;
+  }
+  .receipt-clear{
+    appearance: none; background: none; border: none; color: var(--text-muted);
+    font-size: 12.5px; cursor: pointer; text-decoration: underline;
+  }
+  .receipt-preview-note{ font-size: 12.5px; color: var(--text-secondary); }
+
+  .lightbox{
+    position: fixed; inset: 0; background: rgba(10,8,5,0.78);
+    display: flex; align-items: center; justify-content: center;
+    z-index: 100; cursor: zoom-out; padding: 24px;
+  }
+  .lightbox img{ max-width: 100%; max-height: 100%; border-radius: 10px; box-shadow: 0 20px 60px rgba(0,0,0,0.4); }
+
+  /* Subscriptions */
+  .sub-list{ display: flex; flex-direction: column; }
+  .sub-row{
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 6px 14px;
+    padding: 12px 16px;
+    border-bottom: 1px solid var(--border);
+    font-size: 13.5px;
+  }
+  .sub-row:last-child{ border-bottom: none; }
+  .sub-name{ font-weight: 500; min-width: 110px; }
+  .sub-meta{ color: var(--text-secondary); font-size: 12.5px; }
+  .sub-cycle-badge{
+    font-size: 11px; text-transform: uppercase; letter-spacing: 0.04em;
+    color: var(--text-muted); background: var(--surface-2); border: 1px solid var(--border);
+    border-radius: 100px; padding: 2px 8px;
+  }
+  .sub-amount{
+    font-family: "IBM Plex Mono", monospace; font-variant-numeric: tabular-nums;
+    font-weight: 500; margin-left: auto;
+  }
+  .sub-actions{ display: flex; gap: 6px; }
+  .mini-btn{
+    appearance: none; background: none; cursor: pointer;
+    font-family: "Work Sans", sans-serif; font-size: 12px; border-radius: 6px;
+    padding: 4px 9px; border: 1px solid var(--border-strong); color: var(--text-secondary);
+  }
+  .mini-btn:hover{ color: var(--text-primary); background: var(--surface-2); }
+  .mini-btn.danger:hover{ color: var(--status-critical); }
+  .sub-add-form{ display: flex; flex-wrap: wrap; gap: 8px; padding: 14px 16px; align-items: end; }
+  .sub-add-form .field{ flex: 1 1 120px; }
+  .sub-empty{ padding: 16px; color: var(--text-muted); font-size: 13.5px; }
+
+  /* Trend chart */
+  .trend-wrap{ padding: 16px; }
+  .trend-svg{ width: 100%; height: 110px; display: block; overflow: visible; }
+  .trend-bar{ cursor: pointer; }
+  .trend-axis{ display: flex; justify-content: space-between; font-size: 11px; color: var(--text-muted); margin-top: 6px; }
+  .trend-caption{ font-size: 12.5px; color: var(--text-secondary); margin-top: 8px; min-height: 1.4em; }
+  .legend-dot{ display: inline-block; width: 8px; height: 8px; border-radius: 50%; margin-right: 4px; vertical-align: middle; }
+  .pace-note{
+    margin-top: 10px;
+    font-size: 12.5px;
+    padding: 8px 12px;
+    border-radius: 8px;
+    background: var(--surface-2);
+    border: 1px solid var(--border);
+    color: var(--text-secondary);
+  }
+  .pace-note.good{ color: var(--status-good); }
+  .pace-note.warning{
+    background: color-mix(in srgb, var(--status-warning-bg) 14%, var(--surface));
+    border-color: var(--status-warning-bg);
+    color: var(--status-warning-text);
+  }
+
+  /* Dashboard summary links */
+  .dash-links{ display: flex; gap: 10px; flex-wrap: wrap; }
+  .dash-link-card{
+    flex: 1 1 220px;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 14px 16px;
+    box-shadow: var(--shadow);
+    cursor: pointer;
+    text-align: left;
+  }
+  .dash-link-card:hover{ border-color: var(--border-strong); }
+  .dash-link-card .dl-title{ font-weight: 500; font-size: 14px; margin-bottom: 4px; }
+  .dash-link-card .dl-sub{ font-size: 12.5px; color: var(--text-secondary); }
+
+  table.tx-table{ width: 100%; border-collapse: collapse; }
+  table.tx-table th{
+    text-align: left;
+    font-size: 11.5px;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    color: var(--text-muted);
+    font-weight: 500;
+    padding: 10px 16px;
+    border-bottom: 1px solid var(--border);
+    white-space: nowrap;
+  }
+  table.tx-table td{
+    padding: 10px 16px;
+    border-bottom: 1px solid var(--border);
+    font-size: 13.5px;
+    vertical-align: middle;
+  }
+  table.tx-table tr:last-child td{ border-bottom: none; }
+  td.tx-date, td.tx-amount{ font-family: "IBM Plex Mono", monospace; font-variant-numeric: tabular-nums; white-space: nowrap; }
+  td.tx-amount{ text-align: right; font-weight: 500; }
+  td.tx-cat{ display: flex; align-items: center; gap: 8px; white-space: nowrap; }
+  td.tx-cat .swatch{ width: 8px; height: 8px; border-radius: 50%; flex: none; }
+  td.tx-note{ color: var(--text-secondary); }
+  td.tx-pm{ white-space: nowrap; color: var(--text-secondary); font-size: 12.5px; }
+  td.tx-receipt{ white-space: nowrap; }
+  .row-delete{
+    appearance: none;
+    background: none;
+    border: none;
+    color: var(--text-muted);
+    cursor: pointer;
+    font-size: 12px;
+    padding: 4px 6px;
+    border-radius: 5px;
+  }
+  .row-delete:hover{ color: var(--status-critical); background: var(--surface-2); }
+  .row-edit{
+    appearance: none;
+    background: none;
+    border: none;
+    color: var(--text-muted);
+    cursor: pointer;
+    font-size: 12px;
+    padding: 4px 6px;
+    border-radius: 5px;
+  }
+  .row-edit:hover{ color: var(--text-primary); background: var(--surface-2); }
+  td.tx-actions{ white-space: nowrap; }
+  .empty-note{ padding: 22px 16px; color: var(--text-muted); font-size: 13.5px; text-align: center; }
+
+  .modal-overlay{
+    position: fixed; inset: 0; background: rgba(10,8,5,0.6);
+    display: flex; align-items: center; justify-content: center;
+    z-index: 200; padding: 20px; overflow-y: auto;
+  }
+  .modal-card{
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 14px;
+    box-shadow: 0 20px 60px rgba(0,0,0,0.35);
+    max-width: 480px;
+    width: 100%;
+    padding: 20px;
+    max-height: 90vh;
+    overflow-y: auto;
+  }
+  .modal-card form{ display: flex; flex-direction: column; gap: 12px; }
+  .modal-head{
+    display: flex; align-items: center; justify-content: space-between;
+    margin-bottom: 2px;
+  }
+  .modal-close{
+    appearance: none; background: none; border: none; cursor: pointer;
+    font-size: 17px; color: var(--text-muted); line-height: 1; padding: 4px;
+  }
+  .modal-close:hover{ color: var(--text-primary); }
+  .modal-row{ display: flex; gap: 10px; flex-wrap: wrap; }
+  .modal-row .field{ flex: 1 1 140px; min-width: 0; }
+  .modal-actions{ display: flex; justify-content: flex-end; gap: 10px; margin-top: 4px; }
+
+  .table-scroll{ overflow-x: auto; }
+
+  footer.foot{
+    margin-top: 36px;
+    color: var(--text-muted);
+    font-size: 12.5px;
+    text-align: center;
+  }
+  .sync-status{
+    margin-top: 6px;
+    color: var(--text-muted);
+    font-size: 11px;
+    text-align: center;
+  }
+  #save-banner{
+    display: none;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    flex-wrap: wrap;
+    background: var(--surface-2);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 10px 14px;
+    font-size: 13px;
+    color: var(--text-secondary);
+    margin-bottom: 20px;
+  }
+  #save-banner.warn{
+    background: color-mix(in srgb, var(--status-warning-bg) 20%, var(--surface));
+    border-color: var(--status-warning-bg);
+    color: var(--status-warning-text);
+    font-weight: 500;
+  }
+  #save-banner .banner-retry{
+    appearance: none;
+    border: none;
+    border-radius: 100px;
+    font-family: "Work Sans", sans-serif;
+    font-size: 12.5px;
+    font-weight: 600;
+    padding: 6px 14px;
+    cursor: pointer;
+    white-space: nowrap;
+    flex: none;
+    background: var(--text-primary);
+    color: var(--bg);
+  }
+  #save-banner.warn .banner-retry{
+    background: var(--status-warning-text);
+    color: var(--surface);
+  }
+  [hidden]{ display: none !important; }
+
+  @media (max-width: 560px){
+    .cat-row{
+      grid-template-columns: 1fr auto;
+      grid-template-areas: "name edit" "bar bar" "amounts amounts";
+      row-gap: 6px;
+    }
+    .cat-row .cat-name{ grid-area: name; }
+    .cat-row .edit-budget-btn{ grid-area: edit; }
+    .cat-row .cat-chevron{ grid-area: edit; }
+    .cat-row .bar-track{ grid-area: bar; }
+    .cat-row .cat-amounts{ grid-area: amounts; text-align: left; }
+    .ptype-row{ grid-template-columns: repeat(2, 1fr); }
+    .stat-tile{ padding: 12px 10px; }
+    .stat-value{ font-size: 18px; }
+  }
+</style>
+</head>
+<body>
+
+<div class="page">
+  <header class="top">
+    <h1>Budget Ledger</h1>
+    <p class="subtitle">Personal spending and wedding costs, tracked side by side.</p>
+  </header>
+
+  <div id="save-banner"></div>
+
+  <nav class="tabs" role="tablist">
+    <button class="tab active" data-tracker="personal" role="tab">Personal</button>
+    <button class="tab" data-tracker="wedding" role="tab">Wedding</button>
+  </nav>
+
+  <div id="personal-panel" data-panel="personal"></div>
+  <div id="wedding-panel" data-panel="wedding" hidden></div>
+
+  <footer class="foot">Numbers stay in this ledger — synced to any device you open it on.</footer>
+  <div id="sync-status" class="sync-status"></div>
+</div>
+
+<input type="file" id="receipt-file-input" accept="image/*" capture="environment" hidden>
+<div id="lightbox" class="lightbox" hidden><img id="lightbox-img" alt="Receipt"></div>
+<div id="edit-expense-modal"></div>
+
+<script>
+(function(){
+  "use strict";
+
+  var SERIES_VARS = ["--series-1","--series-2","--series-3","--series-4","--series-5","--series-6","--series-7","--series-8"];
+
+  var PAYMENT_TYPES = [
+    { id: "cash", label: "Cash", emoji: "💵", needsCard: false },
+    { id: "bank_transfer", label: "Bank Transfer", emoji: "🏦", needsCard: false },
+    { id: "credit", label: "Credit Card", emoji: "💳", needsCard: true },
+    { id: "miles", label: "Miles / Points", emoji: "✈️", needsCard: true }
+  ];
+
+  var DEFAULT_INCOME_TYPES = [
+    { id: "salary", label: "Salary", emoji: "💼" },
+    { id: "bonus", label: "Bonus", emoji: "🏆" },
+    { id: "gift", label: "Gift", emoji: "🎁" },
+    { id: "other", label: "Other", emoji: "💰" }
+  ];
+
+  var INCOME_FREQUENCIES = [
+    { id: "weekly", label: "Weekly" },
+    { id: "biweekly", label: "Bi-weekly" },
+    { id: "semimonthly", label: "Semi-monthly" },
+    { id: "monthly", label: "Monthly" },
+    { id: "yearly", label: "Yearly" }
+  ];
+
+  var PAY_FREQUENCIES = [
+    { id: "weekly", label: "Weekly", periods: 52 },
+    { id: "biweekly", label: "Bi-weekly", periods: 26 },
+    { id: "semimonthly", label: "Semi-monthly", periods: 24 },
+    { id: "monthly", label: "Monthly", periods: 12 }
+  ];
+
+  var DEFAULT_BUDGETS = {
+    personal: {
+      hint: "Starter categories with placeholder amounts — click any figure to set your own.",
+      categories: [
+        { name: "Housing", budget: 1800, subcategories: ["Rent/Mortgage", "Property Tax", "HOA Fees", "Home Maintenance", "Home Insurance"] },
+        { name: "Groceries", budget: 500, subcategories: ["Supermarket", "Warehouse Club", "Specialty/Butcher", "Farmers Market"] },
+        { name: "Transportation", budget: 300, subcategories: ["Gas", "Car Payment", "Car Insurance", "Maintenance & Repairs", "Parking & Tolls", "Public Transit", "Rideshare"] },
+        { name: "Utilities", budget: 200, subcategories: ["Electric", "Gas/Heating", "Water & Sewer", "Trash", "Internet", "Cell Phone"] },
+        { name: "Insurance", budget: 150, subcategories: ["Health Insurance", "Life Insurance", "Renters/Home Insurance", "Disability Insurance"] },
+        { name: "Entertainment", budget: 150, subcategories: ["Bar", "Snowboarding", "Mountain Biking", "Rock Climbing", "Surfing", "Video Games", "Movies"] },
+        { name: "Savings", budget: 400, subcategories: ["401k", "Brokerage", "Roth IRA", "Emergency Fund"] },
+        { name: "Other", budget: 200, subcategories: ["Subscriptions", "Gifts", "Miscellaneous", "Personal Care"] }
+      ]
+    },
+    wedding: {
+      hint: "Sized as a starting point for a ~100-guest SoCal wedding — replace with your real quotes as they come in.",
+      categories: [
+        { name: "Venue", budget: 8000, subcategories: ["Site Fee", "Ceremony Site", "Reception Site", "Deposit"] },
+        { name: "Catering", budget: 12000, subcategories: ["Dinner", "Appetizers", "Cake", "Bar Service", "Tastings"] },
+        { name: "Bar", budget: 3500, subcategories: ["Alcohol", "Bartending Service", "Mixers & Ice", "Glassware Rental"] },
+        { name: "Photo & Video", budget: 4500, subcategories: ["Photographer", "Videographer", "Engagement Shoot", "Prints & Albums"] },
+        { name: "Attire", budget: 2500, subcategories: ["Wedding Dress", "Suit/Tux", "Alterations", "Shoes & Accessories", "Hair & Makeup"] },
+        { name: "Flowers & Decor", budget: 3000, subcategories: ["Bouquets", "Centerpieces", "Ceremony Decor", "Reception Decor", "Lighting"] },
+        { name: "Music & DJ", budget: 1800, subcategories: ["Ceremony Music", "Reception DJ/Band", "Sound Equipment"] },
+        { name: "Rentals & Other", budget: 1500, subcategories: ["Tables & Chairs", "Linens", "Tent", "Dance Floor"] },
+        { name: "Staff", budget: 0, subcategories: ["Wedding Planner", "Officiant", "Wait Staff Gratuity", "Coordinator"] },
+        { name: "Transportation", budget: 0, subcategories: ["Getaway Car", "Guest Shuttle", "Wedding Party Transport"] },
+        { name: "Gifts", budget: 0, subcategories: ["Wedding Party Gifts", "Parent Gifts", "Favors"] },
+        { name: "Fees", budget: 0, subcategories: ["Marriage License", "Vendor Service Fees", "Permits", "Service Charges"] }
+      ]
+    }
+  };
+
+  // =========================================================================
+  // GOOGLE DRIVE SETUP — do this once before your data will save anywhere:
+  //   1. Go to https://console.cloud.google.com/ and create a project (free).
+  //   2. APIs & Services -> Library -> enable the "Google Drive API".
+  //   3. APIs & Services -> OAuth consent screen -> set it up as "External",
+  //      add yourself as a test user (or publish it — it's just for you).
+  //   4. APIs & Services -> Credentials -> Create Credentials -> OAuth client ID
+  //      -> Application type "Web application".
+  //   5. Under "Authorized JavaScript origins" add the exact URL this page will
+  //      be served from, e.g. https://yourname.github.io (no trailing slash,
+  //      no path). Add http://localhost:PORT too if you test it locally.
+  //   6. Copy the Client ID it gives you (ends in .apps.googleusercontent.com)
+  //      and paste it below, replacing the placeholder text.
+  //   7. Commit and push — GitHub Pages will pick it up automatically.
+  // The app only ever asks Drive for permission to see/edit the ONE file it
+  // creates for itself (scope: drive.file) — it can't see any of your other
+  // Drive files.
+  // =========================================================================
+  var GOOGLE_CLIENT_ID = "335959224951-jbqspl556j7j1606nfsedduarrsheduc.apps.googleusercontent.com";
+  var DRIVE_FILE_NAME = "budget-ledger-data.json";
+
+  var currency = new Intl.NumberFormat("en-US", { style: "currency", currency: "USD", maximumFractionDigits: 0 });
+  var currencyPrecise = new Intl.NumberFormat("en-US", { style: "currency", currency: "USD" });
+
+  var drive = { tokenClient: null, accessToken: null, fileId: null, connected: false };
+  var persistTimer = null;
+
+  var state = {
+    tracker: "personal",
+    page: "dashboard", // dashboard | log | manage | detail
+    detailCategory: null,
+    personalMonth: currentMonthKey(),
+    sample: null,
+    sampleImagesOk: false,
+    downloads: null,
+    scanTracker: null,
+    budgets: { personal: null, wedding: null },
+    expenses: [],
+    paymentMethods: { items: [] },
+    subscriptions: { personal: { items: [] }, wedding: { items: [] } },
+    income: { personal: { items: [] }, wedding: { items: [] } },
+    incomeTypes: null,
+    recurringIncome: { personal: { items: [] }, wedding: { items: [] } },
+    salarySetup: { annualSalary: 0, payFrequency: "biweekly", deductions: [] },
+    vendors: { wedding: { items: [] } },
+    pendingReceipt: { personal: null, wedding: null },
+    editingCategory: null,
+    editingExpense: null,
+    editingDeduction: null,
+    expandedCategory: null,
+    logFilter: { personal: { q: "", category: "", type: "" }, wedding: { q: "", category: "", type: "" } },
+    importPreview: null,
+    exportText: null,
+    backupExportText: null,
+    backupImportPreview: null,
+    backupImportError: null,
+    histCaption: { personal: null, wedding: null },
+    lastSyncedAt: null,
+    syncErrors: []
+  };
+
+  function uid(prefix){
+    return prefix + "-" + Date.now().toString(36) + Math.random().toString(36).slice(2, 8);
+  }
+
+  function todayStr(){
+    var d = new Date();
+    var m = String(d.getMonth() + 1).padStart(2, "0");
+    var day = String(d.getDate()).padStart(2, "0");
+    return d.getFullYear() + "-" + m + "-" + day;
+  }
+
+  function currentMonthKey(){
+    var d = new Date();
+    return d.getFullYear() + "-" + String(d.getMonth() + 1).padStart(2, "0");
+  }
+
+  function monthLabel(key){
+    var parts = key.split("-").map(Number);
+    var d = new Date(parts[0], parts[1] - 1, 1);
+    return d.toLocaleDateString("en-US", { month: "long", year: "numeric" });
+  }
+
+  function shiftMonth(key, delta){
+    var parts = key.split("-").map(Number);
+    var d = new Date(parts[0], parts[1] - 1 + delta, 1);
+    return d.getFullYear() + "-" + String(d.getMonth() + 1).padStart(2, "0");
+  }
+
+  function fmtDate(iso){
+    if(!iso) return "";
+    var parts = iso.split("-");
+    if(parts.length !== 3) return iso;
+    var d = new Date(Number(parts[0]), Number(parts[1]) - 1, Number(parts[2]));
+    return d.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
+  }
+
+  function addToDate(iso, cycle){
+    var parts = (iso || todayStr()).split("-").map(Number);
+    var d = new Date(parts[0], parts[1] - 1, parts[2]);
+    if(cycle === "yearly") d.setFullYear(d.getFullYear() + 1);
+    else if(cycle === "weekly") d.setDate(d.getDate() + 7);
+    else if(cycle === "biweekly") d.setDate(d.getDate() + 14);
+    else if(cycle === "semimonthly") d.setDate(d.getDate() + 15);
+    else d.setMonth(d.getMonth() + 1);
+    var m = String(d.getMonth() + 1).padStart(2, "0");
+    var day = String(d.getDate()).padStart(2, "0");
+    return d.getFullYear() + "-" + m + "-" + day;
+  }
+
+  function statusFor(spent, budget){
+    if(budget <= 0) return spent > 0 ? "critical" : "good";
+    var pct = spent / budget;
+    if(pct > 1) return "critical";
+    if(pct >= 0.8) return "warning";
+    return "good";
+  }
+
+  function escapeHtml(s){
+    return String(s == null ? "" : s).replace(/[&<>"']/g, function(c){
+      return { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c];
+    });
+  }
+
+  function paymentMethodById(id){
+    return (state.paymentMethods.items || []).find(function(p){ return p.id === id; }) || null;
+  }
+
+  function paymentTypeMeta(id){
+    return PAYMENT_TYPES.find(function(t){ return t.id === id; }) || PAYMENT_TYPES[0];
+  }
+
+  function normalizeExpense(e){
+    if(!e.paymentType){
+      if(e.paymentMethodId){ e.paymentType = "credit"; e.cardId = e.paymentMethodId; }
+      else { e.paymentType = "cash"; e.cardId = null; }
+    }
+    if(e.cardId === undefined) e.cardId = e.paymentMethodId || null;
+    return e;
+  }
+
+  function paymentLabel(e){
+    var meta = paymentTypeMeta(e.paymentType || "cash");
+    if(meta.needsCard){
+      var card = e.cardId ? paymentMethodById(e.cardId) : null;
+      return meta.emoji + " " + meta.label + (card ? " — " + card.name + (card.last4 ? " ••" + card.last4 : "") : "");
+    }
+    return meta.emoji + " " + meta.label;
+  }
+
+  function milesNote(c){
+    return c.milesSpent > 0 ? '<span style="display:block;white-space:normal;font-size:11px;color:var(--text-muted);margin-top:2px">✈️' + currency.format(c.milesSpent) + ' via miles</span>' : '';
+  }
+
+  function monthKeyFor(tracker){
+    return tracker === "personal" ? state.personalMonth : null;
+  }
+
+  function inMonth(dateStr, monthKey){
+    if(!monthKey) return true;
+    return (dateStr || "").slice(0, 7) === monthKey;
+  }
+
+  function monthlyHistory(tracker, months){
+    var out = [];
+    var d = new Date();
+    d.setDate(1);
+    for(var i = months - 1; i >= 0; i--){
+      var dd = new Date(d.getFullYear(), d.getMonth() - i, 1);
+      var key = dd.getFullYear() + "-" + String(dd.getMonth() + 1).padStart(2, "0");
+      out.push({ key: key, spent: 0 });
+    }
+    var byKey = {};
+    out.forEach(function(m){ byKey[m.key] = m; });
+    state.expenses.forEach(function(e){
+      if(e.tracker !== tracker) return;
+      var k = (e.date || "").slice(0, 7);
+      if(byKey[k]) byKey[k].spent += Number(e.amount) || 0;
+    });
+    return out;
+  }
+
+  function monthlyIncomeHistory(tracker, months){
+    var out = [];
+    var d = new Date();
+    d.setDate(1);
+    for(var i = months - 1; i >= 0; i--){
+      var dd = new Date(d.getFullYear(), d.getMonth() - i, 1);
+      var key = dd.getFullYear() + "-" + String(dd.getMonth() + 1).padStart(2, "0");
+      out.push({ key: key, income: 0 });
+    }
+    var byKey = {};
+    out.forEach(function(m){ byKey[m.key] = m; });
+    (state.income[tracker] && state.income[tracker].items || []).forEach(function(i){
+      var k = (i.date || "").slice(0, 7);
+      if(byKey[k]) byKey[k].income += Number(i.amount) || 0;
+    });
+    return out;
+  }
+
+  function incomeTotals(tracker, monthKey){
+    return (state.income[tracker] && state.income[tracker].items || []).reduce(function(s, i){
+      if(!inMonth(i.date, monthKey)) return s;
+      return s + (Number(i.amount) || 0);
+    }, 0);
+  }
+
+  function incomeTypesList(){
+    return (state.incomeTypes && state.incomeTypes.length) ? state.incomeTypes : DEFAULT_INCOME_TYPES;
+  }
+
+  function incomeTypeMeta(id){
+    return incomeTypesList().find(function(t){ return t.id === id; }) || { id: "other", label: "Other", emoji: "💰" };
+  }
+
+  function incomeTypeTotals(tracker, monthKey){
+    var totals = {};
+    incomeTypesList().forEach(function(t){ totals[t.id] = 0; });
+    (state.income[tracker] && state.income[tracker].items || []).forEach(function(i){
+      if(!inMonth(i.date, monthKey)) return;
+      var type = i.type || "other";
+      totals[type] = (totals[type] || 0) + (Number(i.amount) || 0);
+    });
+    return totals;
+  }
+
+  function vendorById(id){
+    return (state.vendors.wedding && state.vendors.wedding.items || []).find(function(v){ return v.id === id; }) || null;
+  }
+
+  function vendorSelectOptions(selectedId){
+    return (state.vendors.wedding && state.vendors.wedding.items || []).map(function(v){
+      return '<option value="' + v.id + '"' + (v.id === selectedId ? ' selected' : '') + '>' + escapeHtml(v.name) + '</option>';
+    }).join("");
+  }
+
+  function vendorLabel(e){
+    if(e.vendor) return e.vendor;
+    if(e.vendorId){
+      var v = vendorById(e.vendorId);
+      if(v) return v.name;
+    }
+    return "";
+  }
+
+  function vendorSuggestions(tracker){
+    var set = {};
+    if(tracker === "wedding"){
+      (state.vendors.wedding.items || []).forEach(function(v){ set[v.name] = true; });
+    }
+    state.expenses.forEach(function(e){ if(e.tracker === tracker && e.vendor) set[e.vendor] = true; });
+    (state.subscriptions[tracker] && state.subscriptions[tracker].items || []).forEach(function(s){ if(s.vendor) set[s.vendor] = true; });
+    return Object.keys(set).sort();
+  }
+
+  function vendorDatalistHtml(tracker, idAttr){
+    var names = vendorSuggestions(tracker);
+    return '<datalist id="' + idAttr + '">' + names.map(function(n){ return '<option value="' + escapeHtml(n) + '">'; }).join("") + '</datalist>';
+  }
+
+  function hasVendorTags(tracker){
+    return state.expenses.some(function(e){ return e.tracker === tracker && (e.vendor || e.vendorId); });
+  }
+
+  function subcategoriesFor(tracker, categoryName){
+    var doc = state.budgets[tracker];
+    var cat = doc && (doc.categories || []).find(function(c){ return c.name === categoryName; });
+    return (cat && cat.subcategories) || [];
+  }
+
+  function subcategoryOptionsHtml(tracker, categoryName, selected){
+    var subs = subcategoriesFor(tracker, categoryName);
+    var html = '<option value="">No subcategory</option>';
+    subs.forEach(function(s){
+      html += '<option value="' + escapeHtml(s) + '"' + (s === selected ? ' selected' : '') + '>' + escapeHtml(s) + '</option>';
+    });
+    return html;
+  }
+
+  function subcategoryTotals(tracker, categoryName, monthKey){
+    var subs = subcategoriesFor(tracker, categoryName);
+    var totals = subs.map(function(s){ return { name: s, spent: 0 }; });
+    var byName = {};
+    totals.forEach(function(t){ byName[t.name] = t; });
+    var untagged = { name: "No subcategory", spent: 0 };
+    state.expenses.forEach(function(e){
+      if(e.tracker !== tracker || e.category !== categoryName) return;
+      if(!inMonth(e.date, monthKey)) return;
+      if(e.subcategory){
+        if(!byName[e.subcategory]){
+          var extra = { name: e.subcategory, spent: 0 };
+          byName[e.subcategory] = extra;
+          totals.push(extra);
+        }
+        byName[e.subcategory].spent += Number(e.amount) || 0;
+      } else {
+        untagged.spent += Number(e.amount) || 0;
+      }
+    });
+    if(untagged.spent > 0) totals.push(untagged);
+    return totals;
+  }
+
+  function csvField(v){
+    var s = String(v == null ? "" : v);
+    if(/[",\n]/.test(s)) s = '"' + s.replace(/"/g, '""') + '"';
+    return s;
+  }
+
+  function buildExpensesCsv(){
+    var rows = [["Tracker", "Date", "Category", "Subcategory", "Vendor", "Payment Type", "Card", "Amount", "Note"]];
+    state.expenses.slice().sort(function(a, b){ return (a.date || "").localeCompare(b.date || ""); }).forEach(function(e){
+      var card = e.cardId ? paymentMethodById(e.cardId) : null;
+      rows.push([
+        e.tracker, e.date || "", e.category || "", e.subcategory || "", vendorLabel(e),
+        paymentTypeMeta(e.paymentType || "cash").label,
+        card ? card.name + (card.last4 ? " ••" + card.last4 : "") : "",
+        (Number(e.amount) || 0).toFixed(2), e.note || ""
+      ]);
+    });
+    return rows.map(function(r){ return r.map(csvField).join(","); }).join("\r\n");
+  }
+
+  function parseCsv(text){
+    var rows = [];
+    var row = [];
+    var field = "";
+    var inQuotes = false;
+    for(var i = 0; i < text.length; i++){
+      var c = text[i];
+      if(inQuotes){
+        if(c === '"'){
+          if(text[i + 1] === '"'){ field += '"'; i++; }
+          else inQuotes = false;
+        } else field += c;
+      } else if(c === '"'){
+        inQuotes = true;
+      } else if(c === ","){
+        row.push(field); field = "";
+      } else if(c === "\n" || c === "\r"){
+        if(c === "\r" && text[i + 1] === "\n") i++;
+        row.push(field); field = "";
+        if(row.some(function(f){ return f !== ""; })) rows.push(row);
+        row = [];
+      } else field += c;
+    }
+    if(field !== "" || row.length){ row.push(field); rows.push(row); }
+    return rows;
+  }
+
+  // ---------- rendering ----------
+
+  function render(){
+    renderTabs();
+    ["personal", "wedding"].forEach(function(t){
+      var panel = document.getElementById(t + "-panel");
+      panel.hidden = state.tracker !== t;
+    });
+    renderPanel(state.tracker);
+    renderEditModalMount();
+  }
+
+  function renderEditModalMount(){
+    var mount = document.getElementById("edit-expense-modal");
+    if(mount) mount.innerHTML = renderEditExpenseModal();
+  }
+
+  function renderTabs(){
+    document.querySelectorAll(".tab").forEach(function(btn){
+      btn.classList.toggle("active", btn.dataset.tracker === state.tracker);
+    });
+  }
+
+  function categoryTotals(tracker, monthKey){
+    var budgetDoc = state.budgets[tracker];
+    var categories = (budgetDoc && budgetDoc.categories) || [];
+    var totals = categories.map(function(c){ return { name: c.name, budget: c.budget, spent: 0, milesSpent: 0, subcategories: c.subcategories || [] }; });
+    var byName = {};
+    totals.forEach(function(t){ byName[t.name] = t; });
+    state.expenses.forEach(function(e){
+      if(e.tracker !== tracker) return;
+      if(!inMonth(e.date, monthKey)) return;
+      if(!byName[e.category]){
+        var extra = { name: e.category, budget: 0, spent: 0, milesSpent: 0, subcategories: [] };
+        byName[e.category] = extra;
+        totals.push(extra);
+      }
+      byName[e.category].spent += Number(e.amount) || 0;
+      if(e.paymentType === "miles") byName[e.category].milesSpent += Number(e.amount) || 0;
+    });
+    return totals;
+  }
+
+  function paymentTypeTotals(tracker, monthKey){
+    var totals = {};
+    PAYMENT_TYPES.forEach(function(t){ totals[t.id] = 0; });
+    state.expenses.forEach(function(e){
+      if(e.tracker !== tracker) return;
+      if(!inMonth(e.date, monthKey)) return;
+      var type = e.paymentType || "cash";
+      totals[type] = (totals[type] || 0) + (Number(e.amount) || 0);
+    });
+    return totals;
+  }
+
+  function cardTotals(){
+    var totals = {};
+    state.expenses.forEach(function(e){
+      if(!e.cardId) return;
+      if(!totals[e.cardId]) totals[e.cardId] = { credit: 0, miles: 0 };
+      if(e.paymentType === "miles") totals[e.cardId].miles += Number(e.amount) || 0;
+      else totals[e.cardId].credit += Number(e.amount) || 0;
+    });
+    return totals;
+  }
+
+  function seriesVarFor(i){
+    return SERIES_VARS[((i % SERIES_VARS.length) + SERIES_VARS.length) % SERIES_VARS.length];
+  }
+
+  function statTile(label, value, extra){
+    return '<div class="stat-tile"><div class="stat-label">' + escapeHtml(label) + '</div><div class="stat-value">' + value + '</div>' + (extra || '') + '</div>';
+  }
+
+  function paymentSelectOptions(selectedId){
+    return (state.paymentMethods.items || []).map(function(p){
+      return '<option value="' + p.id + '"' + (p.id === selectedId ? ' selected' : '') + '>' + escapeHtml(p.name) + (p.last4 ? ' ••' + escapeHtml(p.last4) : '') + '</option>';
+    }).join("");
+  }
+
+  function paymentTypeFieldHtml(namePrefix, selectedType, selectedCard){
+    selectedType = selectedType || "cash";
+    var needsCard = paymentTypeMeta(selectedType).needsCard;
+    var html = '<div class="field"><label>Payment</label><select name="' + namePrefix + 'Type" data-role="ptype-select">';
+    PAYMENT_TYPES.forEach(function(t){
+      html += '<option value="' + t.id + '"' + (t.id === selectedType ? ' selected' : '') + '>' + t.emoji + ' ' + t.label + '</option>';
+    });
+    html += '</select></div>';
+    html += '<div class="field" data-role="card-field" style="' + (needsCard ? '' : 'display:none') + '"><label>Card</label><select name="' + namePrefix + 'Card"' + (needsCard ? ' required' : '') + '><option value="">Choose a card…</option>' + paymentSelectOptions(selectedCard) + '</select></div>';
+    return html;
+  }
+
+  function subnavHtml(tracker){
+    var pages = [["dashboard", "📊 Dashboard"], ["log", "📝 Log Expense"], ["income", "💵 Income"]];
+    if(tracker === "personal") pages.push(["salary", "🧮 Salary"]);
+    pages.push(["manage", "⚙️ Manage"]);
+    var html = '<nav class="subnav">';
+    pages.forEach(function(p){
+      html += '<button class="subnav-btn' + (state.page === p[0] ? ' active' : '') + '" data-action="nav" data-tracker="' + tracker + '" data-page="' + p[0] + '">' + p[1] + '</button>';
+    });
+    html += '</nav>';
+    return html;
+  }
+
+  function renderPaymentMethodsSection(){
+    var items = state.paymentMethods.items || [];
+    var totals = cardTotals();
+    var html = '<section>';
+    html += '  <div class="section-head"><span class="section-title">💳 Payment methods</span><span class="section-hint">Nickname and last 4 digits only — never a full card number.</span></div>';
+    html += '  <div class="card pm-body">';
+    if(items.length === 0){
+      html += '<div class="pm-empty">No cards yet. Add one below to tag credit or miles expenses by how you paid.</div>';
+    } else {
+      html += '<div class="pm-list">';
+      items.forEach(function(p){
+        var t = totals[p.id] || { credit: 0, miles: 0 };
+        var totalText = currency.format(t.credit) + ' charged' + (t.miles > 0 ? ' • ' + currency.format(t.miles) + ' in miles' : '');
+        html += '<div class="pm-chip"><span class="pm-name">' + escapeHtml(p.name) + '</span>' +
+          (p.last4 ? '<span class="pm-last4">••' + escapeHtml(p.last4) + '</span>' : '') +
+          '<span class="pm-total">' + totalText + '</span>' +
+          '<button class="pm-remove" data-action="remove-card" data-id="' + p.id + '" title="Remove card">✕</button></div>';
+      });
+      html += '</div>';
+    }
+    html += '  <form class="pm-add-form" data-action="add-card">';
+    html += '    <div class="field"><label>Card nickname</label><input type="text" name="name" placeholder="e.g. Chase Sapphire" maxlength="40" required></div>';
+    html += '    <div class="field narrow"><label>Last 4</label><input type="text" name="last4" placeholder="1234" maxlength="4" pattern="[0-9]{0,4}"></div>';
+    html += '    <button type="submit" class="ghost-btn">+ Add card</button>';
+    html += '  </form>';
+    html += '  </div>';
+    html += '</section>';
+    return html;
+  }
+
+  function renderCategoriesManageSection(tracker){
+    var totals = categoryTotals(tracker, null);
+    var hint = (state.budgets[tracker] && state.budgets[tracker].hint) || "";
+    var html = '<section>';
+    html += '  <div class="section-head"><span class="section-title">🗂️ Categories & budgets</span><span class="section-hint">' + escapeHtml(hint) + '</span></div>';
+    html += '  <div class="card"><div class="cat-list">';
+    totals.forEach(function(c, i){
+      var pct = c.budget > 0 ? Math.min(100, Math.round((c.spent / c.budget) * 100)) : (c.spent > 0 ? 100 : 0);
+      var st = statusFor(c.spent, c.budget);
+      var fillColor = st === "critical" ? "var(--status-critical)" : st === "warning" ? "var(--status-warning-bg)" : "var(" + seriesVarFor(i) + ")";
+      var isEditing = state.editingCategory && state.editingCategory.tracker === tracker && state.editingCategory.name === c.name;
+      var isExpanded = state.expandedCategory && state.expandedCategory.tracker === tracker && state.expandedCategory.name === c.name;
+      var subs = c.subcategories || [];
+      html += '<div class="cat-row">';
+      html += '  <div class="cat-name"><span class="swatch" style="background:var(' + seriesVarFor(i) + ')"></span><div class="cat-name-inner"><span title="' + escapeHtml(c.name) + '">' + escapeHtml(c.name) + '</span>' +
+        '<button type="button" class="subcat-toggle" data-action="toggle-subcats" data-tracker="' + tracker + '" data-name="' + escapeHtml(c.name) + '">🏷️ ' + (subs.length ? subs.length + ' sub' : 'sub') + (isExpanded ? ' ▴' : ' ▾') + '</button></div></div>';
+      html += '  <div class="bar-track"><div class="bar-fill" style="width:' + pct + '%;background:' + fillColor + '"></div></div>';
+      if(isEditing){
+        html += '  <div class="cat-amounts"><input class="budget-edit-input" type="number" min="0" step="0.01" value="' + c.budget + '" data-role="budget-input" data-tracker="' + tracker + '" data-name="' + escapeHtml(c.name) + '"></div>';
+        html += '  <button class="edit-budget-btn" data-action="save-budget" data-tracker="' + tracker + '" data-name="' + escapeHtml(c.name) + '" title="Save">✓</button>';
+      } else {
+        html += '  <div class="cat-amounts' + (c.spent > c.budget && c.budget > 0 ? ' over' : '') + '"><b>' + currency.format(c.spent) + '</b> / ' + currency.format(c.budget) + milesNote(c) + '</div>';
+        html += '  <button class="edit-budget-btn" data-action="edit-budget" data-tracker="' + tracker + '" data-name="' + escapeHtml(c.name) + '" title="Edit budget">✎</button>';
+      }
+      html += '</div>';
+      if(isExpanded){
+        html += '<div class="cat-subrow">';
+        if(subs.length){
+          html += '  <div class="subcat-chip-row">';
+          subs.forEach(function(s){
+            html += '<span class="subcat-chip">' + escapeHtml(s) + '<button type="button" class="subcat-chip-remove" data-action="remove-subcategory" data-tracker="' + tracker + '" data-category="' + escapeHtml(c.name) + '" data-sub="' + escapeHtml(s) + '" title="Remove subcategory">✕</button></span>';
+          });
+          html += '  </div>';
+        } else {
+          html += '  <div class="sub-empty" style="padding:0 0 10px">No subcategories yet — break "' + escapeHtml(c.name) + '" down further below.</div>';
+        }
+        html += '  <form class="subcat-add-inline" data-action="add-subcategory" data-tracker="' + tracker + '" data-category="' + escapeHtml(c.name) + '">';
+        html += '    <input type="text" name="name" placeholder="New subcategory" maxlength="30" required>';
+        html += '    <button type="submit" class="ghost-btn">+ Add subcategory</button>';
+        html += '  </form>';
+        html += '</div>';
+      }
+    });
+    html += '  </div>';
+    html += '  <form class="add-category-form" data-action="add-category-inline" data-tracker="' + tracker + '"><input type="text" name="name" placeholder="New category name" maxlength="40" required><button type="submit" class="ghost-btn">+ Add category</button></form>';
+    html += '  </div>';
+    html += '</section>';
+    return html;
+  }
+
+  function renderSubscriptionsSection(tracker){
+    var totals = categoryTotals(tracker, null);
+    var items = (state.subscriptions[tracker] && state.subscriptions[tracker].items) || [];
+    var sorted = items.slice().sort(function(a, b){ return (a.nextDate || "").localeCompare(b.nextDate || ""); });
+    var monthlyTotal = items.reduce(function(s, i){ return s + (i.cycle === "yearly" ? (Number(i.amount) || 0) / 12 : (Number(i.amount) || 0)); }, 0);
+
+    var html = '<section>';
+    html += '  <div class="section-head"><span class="section-title">🔁 Subscriptions</span><span class="section-hint">' + (items.length ? ('~' + currency.format(monthlyTotal) + '/mo recurring') : 'Recurring payments, tracked separately from one-off expenses') + '</span></div>';
+    html += '  <div class="card">';
+    if(sorted.length === 0){
+      html += '<div class="sub-empty">No subscriptions added yet.</div>';
+    } else {
+      html += '<div class="sub-list">';
+      sorted.forEach(function(s){
+        html += '<div class="sub-row">';
+        html += '  <span class="sub-name">' + escapeHtml(s.name) + '</span>';
+        html += '  <span class="sub-cycle-badge">' + (s.cycle === "yearly" ? "Yearly" : "Monthly") + '</span>';
+        html += '  <span class="sub-meta">' + escapeHtml(s.category || "Uncategorized") + '</span>';
+        if(s.vendor) html += '  <span class="sub-meta">' + escapeHtml(s.vendor) + '</span>';
+        html += '  <span class="sub-meta">' + escapeHtml(paymentLabel(s)) + '</span>';
+        html += '  <span class="sub-meta">Next ' + fmtDate(s.nextDate) + '</span>';
+        html += '  <span class="sub-amount">' + currency.format(s.amount) + '</span>';
+        html += '  <span class="sub-actions"><button class="mini-btn" data-action="log-subscription" data-tracker="' + tracker + '" data-id="' + s.id + '">Log payment</button><button class="mini-btn danger" data-action="remove-subscription" data-tracker="' + tracker + '" data-id="' + s.id + '">Remove</button></span>';
+        html += '</div>';
+      });
+      html += '</div>';
+    }
+    html += '  <form class="sub-add-form" data-action="add-subscription" data-tracker="' + tracker + '">';
+    html += '    <div class="field"><label>Name</label><input type="text" name="name" placeholder="e.g. Spotify" maxlength="40" required></div>';
+    html += '    <div class="field"><label>Amount</label><input type="number" name="amount" min="0" step="0.01" placeholder="0.00" required></div>';
+    html += '    <div class="field"><label>Cycle</label><select name="cycle"><option value="monthly">Monthly</option><option value="yearly">Yearly</option></select></div>';
+    html += '    <div class="field"><label>Category</label><select name="category">' + totals.map(function(c){ return '<option value="' + escapeHtml(c.name) + '">' + escapeHtml(c.name) + '</option>'; }).join("") + '</select></div>';
+    html += '    <div class="field"><label>Vendor / Payee</label><input type="text" name="vendor" list="vendor-dl-sub-' + tracker + '" placeholder="e.g. Spotify" maxlength="60"></div>';
+    html += paymentTypeFieldHtml("sub", "cash", "");
+    html += '    <div class="field"><label>Next date</label><input type="date" name="nextDate" value="' + todayStr() + '"></div>';
+    html += '    <button type="submit" class="submit-btn neutral">Add</button>';
+    html += vendorDatalistHtml(tracker, "vendor-dl-sub-" + tracker);
+    html += '  </form>';
+    html += '  </div>';
+    html += '</section>';
+    return html;
+  }
+
+  function renderTrendChart(tracker){
+    var days = 30;
+    var buckets = [];
+    var today = new Date();
+    today.setHours(0,0,0,0);
+    for(var i = days - 1; i >= 0; i--){
+      var d = new Date(today);
+      d.setDate(d.getDate() - i);
+      var key = d.getFullYear() + "-" + String(d.getMonth()+1).padStart(2,"0") + "-" + String(d.getDate()).padStart(2,"0");
+      buckets.push({ date: key, total: 0 });
+    }
+    var byDate = {};
+    buckets.forEach(function(b){ byDate[b.date] = b; });
+    state.expenses.forEach(function(e){
+      if(e.tracker !== tracker) return;
+      if(byDate[e.date]) byDate[e.date].total += Number(e.amount) || 0;
+    });
+    var max = Math.max.apply(null, buckets.map(function(b){ return b.total; }).concat([1]));
+    var w = 600, h = 100, gap = 2;
+    var bw = (w / days) - gap;
+    var accent = tracker === "wedding" ? "var(--accent-wedding)" : "var(--accent-personal)";
+
+    var svg = '<svg class="trend-svg" viewBox="0 0 ' + w + ' ' + (h + 4) + '" preserveAspectRatio="none" role="img" aria-label="Daily spending, last 30 days">';
+    buckets.forEach(function(b, i){
+      var bh = Math.max(b.total > 0 ? 3 : 1, Math.round((b.total / max) * (h - 6)));
+      var x = i * (bw + gap);
+      var y = h - bh;
+      svg += '<rect class="trend-bar" data-date="' + b.date + '" data-amount="' + b.total.toFixed(2) + '" x="' + x.toFixed(1) + '" y="' + y + '" width="' + Math.max(bw,1).toFixed(1) + '" height="' + bh + '" rx="1.5" style="fill:' + accent + ';opacity:' + (b.total > 0 ? '1' : '0.28') + '"><title>' + fmtDate(b.date) + ': ' + currency.format(b.total) + '</title></rect>';
+    });
+    svg += '</svg>';
+
+    var html = '<section>';
+    html += '  <div class="section-head"><span class="section-title">Spending trend</span><span class="section-hint">Last 30 days · tap a bar for the total</span></div>';
+    html += '  <div class="card trend-wrap">';
+    html += svg;
+    html += '  <div class="trend-axis"><span>' + fmtDate(buckets[0].date) + '</span><span>' + fmtDate(buckets[buckets.length-1].date) + '</span></div>';
+    html += '  <div class="trend-caption" id="trend-caption-' + tracker + '">Tap a bar to see that day&#39;s total.</div>';
+    html += '  </div>';
+    html += '</section>';
+    return html;
+  }
+
+  function renderDashboard(tracker){
+    var monthKey = monthKeyFor(tracker);
+    var totals = categoryTotals(tracker, monthKey);
+    var totalBudget = totals.reduce(function(s, c){ return s + (Number(c.budget) || 0); }, 0);
+    var totalSpent = totals.reduce(function(s, c){ return s + (Number(c.spent) || 0); }, 0);
+    var remaining = totalBudget - totalSpent;
+    var overallStatus = statusFor(totalSpent, totalBudget);
+    var statusLabel = overallStatus === "critical" ? "Over budget" : overallStatus === "warning" ? "Near limit" : "On track";
+    var ptypeTotals = paymentTypeTotals(tracker, monthKey);
+    var subs = (state.subscriptions[tracker] && state.subscriptions[tracker].items) || [];
+    var monthlyRecurring = subs.reduce(function(s, i){ return s + (i.cycle === "yearly" ? (Number(i.amount) || 0) / 12 : (Number(i.amount) || 0)); }, 0);
+
+    var html = "";
+
+    var totalMiles = totals.reduce(function(s, c){ return s + (c.milesSpent || 0); }, 0);
+
+    html += '<section>';
+    html += '  <div class="section-head">';
+    html += '    <span class="section-title">📊 Overview</span>';
+    if(monthKey){
+      html += '    <span class="month-switch"><button data-action="month-prev" title="Previous month">‹</button>' + monthLabel(monthKey) + '<button data-action="month-next" title="Next month">›</button></span>';
+    } else {
+      html += '    <span class="section-hint">All-time</span>';
+    }
+    html += '  </div>';
+    html += '  <div class="stat-row">';
+    html += statTile("💰 Budgeted", currency.format(totalBudget));
+    html += statTile("💸 Spent", currency.format(totalSpent), totalMiles > 0 ? '<div class="section-hint" style="margin-top:6px">✈️ ' + currency.format(totalMiles) + ' via miles</div>' : '');
+    html += statTile(remaining < 0 ? "⚠️ Over by" : "✅ Remaining", currency.format(Math.abs(remaining)),
+      '<span class="status-chip ' + overallStatus + '"><span class="dot"></span>' + statusLabel + '</span>');
+    html += '  </div>';
+    html += '</section>';
+
+    html += '<section>';
+    html += '  <div class="section-head"><span class="section-title">💳 By payment type</span></div>';
+    html += '  <div class="ptype-row">';
+    PAYMENT_TYPES.forEach(function(t, i){
+      html += '<div class="ptype-tile"><div class="ptype-label">' + t.emoji + ' ' + t.label + '</div><div class="ptype-value">' + currency.format(ptypeTotals[t.id] || 0) + '</div></div>';
+    });
+    html += '  </div>';
+    html += '</section>';
+
+    html += renderCashFlowSection(tracker, monthKey);
+    html += renderCashFlowTrendChart(tracker);
+
+    html += renderTrendChart(tracker);
+    html += renderHistorySection(tracker);
+
+    if(tracker === "wedding"){
+      html += renderVendorsSummaryCard();
+    }
+
+    html += '<section>';
+    html += '  <div class="section-head"><span class="section-title">🗂️ Categories</span><span class="section-hint">Tap a category for its transactions</span></div>';
+    html += '  <div class="card"><div class="cat-list">';
+    totals.forEach(function(c, i){
+      var pct = c.budget > 0 ? Math.min(100, Math.round((c.spent / c.budget) * 100)) : (c.spent > 0 ? 100 : 0);
+      var st = statusFor(c.spent, c.budget);
+      var fillColor = st === "critical" ? "var(--status-critical)" : st === "warning" ? "var(--status-warning-bg)" : "var(" + seriesVarFor(i) + ")";
+      html += '<div class="cat-row clickable" data-action="open-category" data-tracker="' + tracker + '" data-name="' + escapeHtml(c.name) + '">';
+      html += '  <div class="cat-name"><span class="swatch" style="background:var(' + seriesVarFor(i) + ')"></span><span title="' + escapeHtml(c.name) + '">' + escapeHtml(c.name) + '</span></div>';
+      html += '  <div class="bar-track"><div class="bar-fill" style="width:' + pct + '%;background:' + fillColor + '"></div></div>';
+      html += '  <div class="cat-amounts' + (c.spent > c.budget && c.budget > 0 ? ' over' : '') + '"><b>' + currency.format(c.spent) + '</b> / ' + currency.format(c.budget) + milesNote(c) + '</div>';
+      html += '  <div class="cat-chevron">›</div>';
+      html += '</div>';
+    });
+    if(totals.length === 0){
+      html += '<div class="empty-note">No categories yet — add some in Manage.</div>';
+    }
+    html += '  </div></div>';
+    html += '</section>';
+
+    html += '<section>';
+    html += '  <div class="dash-links">';
+    html += '    <button type="button" class="dash-link-card" data-action="nav" data-tracker="' + tracker + '" data-page="log"><div class="dl-title">📝 Log an expense →</div><div class="dl-sub">Scan a receipt or enter one by hand</div></button>';
+    html += '    <button type="button" class="dash-link-card" data-action="nav" data-tracker="' + tracker + '" data-page="log"><div class="dl-title">🔁 Subscriptions: ' + (subs.length ? ('~' + currency.format(monthlyRecurring) + '/mo') : 'none yet') + ' →</div><div class="dl-sub">Manage recurring payments, on the Log Expense page</div></button>';
+    html += '    <button type="button" class="dash-link-card" data-action="nav" data-tracker="' + tracker + '" data-page="income"><div class="dl-title">💵 Income sources →</div><div class="dl-sub">Log income and set up recurring paychecks</div></button>';
+    if(tracker === "personal"){
+      html += '    <button type="button" class="dash-link-card" data-action="nav" data-tracker="personal" data-page="salary"><div class="dl-title">🧮 Salary & paycheck →</div><div class="dl-sub">Set your salary and deductions to see your net pay</div></button>';
+    }
+    html += '  </div>';
+    html += '</section>';
+
+    return html;
+  }
+
+  function renderCashFlowSection(tracker, monthKey){
+    var income = incomeTotals(tracker, monthKey);
+    var catTotals = categoryTotals(tracker, monthKey);
+    var spent = catTotals.reduce(function(s, c){ return s + c.spent; }, 0);
+    var totalBudget = catTotals.reduce(function(s, c){ return s + (Number(c.budget) || 0); }, 0);
+    var net = income - spent;
+    var html = '<section>';
+    html += '  <div class="section-head"><span class="section-title">💵 Cash flow</span><span class="section-hint">Income logged on the Income page minus what you spent</span></div>';
+    html += '  <div class="stat-row" style="grid-template-columns:repeat(2,1fr)">';
+    html += statTile("📥 Income", currency.format(income));
+    html += statTile(net >= 0 ? "📈 Net" : "📉 Net", (net >= 0 ? "+" : "−") + currency.format(Math.abs(net)));
+    html += '  </div>';
+    if(monthKey && monthKey === currentMonthKey() && totalBudget > 0){
+      var today = new Date();
+      var daysInMonth = new Date(today.getFullYear(), today.getMonth() + 1, 0).getDate();
+      var dayOfMonth = today.getDate();
+      var daysLeft = daysInMonth - dayOfMonth;
+      var pctMonth = Math.round((dayOfMonth / daysInMonth) * 100);
+      var pctBudget = Math.round((spent / totalBudget) * 100);
+      var onPace = pctBudget <= pctMonth + 5;
+      html += '  <div class="pace-note ' + (onPace ? "good" : "warning") + '">' + (onPace ? "✅ " : "⚠️ ") + daysLeft + " day" + (daysLeft === 1 ? "" : "s") + " left in " + monthLabel(monthKey).split(" ")[0] + " — you&#39;ve used " + pctBudget + "% of budget with " + pctMonth + "% of the month gone</div>";
+    }
+    var monthTxs = state.expenses.filter(function(e){ return e.tracker === tracker && inMonth(e.date, monthKey); });
+    var biggest = monthTxs.reduce(function(top, e){ return (!top || (Number(e.amount) || 0) > (Number(top.amount) || 0)) ? e : top; }, null);
+    if(biggest && Number(biggest.amount) > 0){
+      var bigLabel = escapeHtml(biggest.category || "Other") + (vendorLabel(biggest) ? " — " + escapeHtml(vendorLabel(biggest)) : "");
+      html += '  <div class="section-hint" style="margin-top:8px">🔎 Biggest expense ' + (monthKey ? "this month" : "on record") + ': ' + bigLabel + ' — <b style="color:var(--text-primary)">' + currencyPrecise.format(Number(biggest.amount) || 0) + '</b></div>';
+    }
+    html += '</section>';
+    return html;
+  }
+
+  function renderCashFlowTrendChart(tracker){
+    var expenseMonths = monthlyHistory(tracker, 6);
+    var incomeMonths = monthlyIncomeHistory(tracker, 6);
+    var incomeByKey = {};
+    incomeMonths.forEach(function(m){ incomeByKey[m.key] = m.income; });
+    var combined = expenseMonths.map(function(m){ return { key: m.key, spent: m.spent, income: incomeByKey[m.key] || 0 }; });
+
+    var max = Math.max.apply(null, combined.reduce(function(arr, m){ arr.push(m.spent, m.income); return arr; }, [1]));
+    var w = 600, centerX = w / 2, gutterHalf = 34, outerPad = 54, rowH = 24, rowGap = 14;
+    var barAreaW = centerX - gutterHalf - outerPad;
+    var totalH = combined.length * rowH + (combined.length - 1) * rowGap;
+
+    var svg = '<svg class="trend-svg" viewBox="0 0 ' + w + ' ' + (totalH + 8) + '" preserveAspectRatio="none" role="img" aria-label="Monthly expenses versus income, last 6 months" style="height:' + (totalH + 30) + 'px">';
+    combined.forEach(function(m, i){
+      var y = i * (rowH + rowGap) + 4;
+      var expLen = Math.max(m.spent > 0 ? 4 : 0, Math.round((m.spent / max) * barAreaW));
+      var incLen = Math.max(m.income > 0 ? 4 : 0, Math.round((m.income / max) * barAreaW));
+      var isCurrent = m.key === currentMonthKey();
+      var opacity = isCurrent ? "1" : "0.6";
+      var expX = centerX + gutterHalf;
+      var incX = centerX - gutterHalf - incLen;
+      svg += '<rect class="cashflow-bar" data-key="' + m.key + '" data-spent="' + m.spent.toFixed(2) + '" data-income="' + m.income.toFixed(2) + '" x="' + expX + '" y="' + y + '" width="' + expLen + '" height="' + rowH + '" rx="4" style="fill:var(--chart-expense);opacity:' + opacity + '"><title>' + monthLabel(m.key) + ' expenses: ' + currency.format(m.spent) + '</title></rect>';
+      svg += '<rect class="cashflow-bar" data-key="' + m.key + '" data-spent="' + m.spent.toFixed(2) + '" data-income="' + m.income.toFixed(2) + '" x="' + incX + '" y="' + y + '" width="' + incLen + '" height="' + rowH + '" rx="4" style="fill:var(--chart-income);opacity:' + opacity + '"><title>' + monthLabel(m.key) + ' income: ' + currency.format(m.income) + '</title></rect>';
+      if(m.spent > 0){
+        svg += '<text x="' + (expX + expLen + 8) + '" y="' + (y + rowH / 2 + 4) + '" text-anchor="start" style="font-size:10.5px;font-weight:500;fill:var(--chart-expense);opacity:' + opacity + ';font-family:\'Work Sans\',sans-serif;pointer-events:none">' + currency.format(m.spent) + '</text>';
+      }
+      if(m.income > 0){
+        svg += '<text x="' + (incX - 8) + '" y="' + (y + rowH / 2 + 4) + '" text-anchor="end" style="font-size:10.5px;font-weight:500;fill:var(--chart-income);opacity:' + opacity + ';font-family:\'Work Sans\',sans-serif;pointer-events:none">' + currency.format(m.income) + '</text>';
+      }
+      var lbl = monthLabel(m.key).split(" ")[0].slice(0, 3);
+      svg += '<text x="' + centerX + '" y="' + (y + rowH / 2 + 4) + '" text-anchor="middle" style="font-size:10px;fill:var(--text-muted);font-family:\'Work Sans\',sans-serif;pointer-events:none">' + lbl + '</text>';
+    });
+    svg += '</svg>';
+
+    var html = '<section>';
+    html += '  <div class="section-head"><span class="section-title">📊 Expenses vs. income</span><span class="section-hint"><span class="legend-dot" style="background:var(--chart-expense)"></span>Expenses (right)&nbsp;&nbsp;<span class="legend-dot" style="background:var(--chart-income)"></span>Income (left)</span></div>';
+    html += '  <div class="card trend-wrap">' + svg + '<div class="trend-caption" id="cashflow-caption-' + tracker + '">Tap a bar to see that month&#39;s totals.</div></div>';
+    html += '</section>';
+    return html;
+  }
+
+  function renderHistorySection(tracker){
+    var months = monthlyHistory(tracker, 6);
+    var max = Math.max.apply(null, months.map(function(m){ return m.spent; }).concat([1]));
+    var w = 600, labelW = 66, rightPad = 64, rowH = 24, rowGap = 14;
+    var barAreaW = w - labelW - rightPad;
+    var totalH = months.length * rowH + (months.length - 1) * rowGap;
+    var accent = tracker === "wedding" ? "var(--accent-wedding)" : "var(--accent-personal)";
+    var svg = '<svg class="trend-svg" viewBox="0 0 ' + w + ' ' + (totalH + 8) + '" preserveAspectRatio="none" role="img" aria-label="Monthly spending, last 6 months" style="height:' + (totalH + 30) + 'px">';
+    months.forEach(function(m, i){
+      var y = i * (rowH + rowGap) + 4;
+      var barLen = Math.max(m.spent > 0 ? 4 : 1, Math.round((m.spent / max) * barAreaW));
+      var isCurrent = m.key === currentMonthKey();
+      var lbl = monthLabel(m.key).split(" ")[0].slice(0, 3);
+      svg += '<text x="' + (labelW - 8) + '" y="' + (y + rowH / 2 + 4) + '" text-anchor="end" style="font-size:11px;fill:var(--text-secondary);font-family:\'Work Sans\',sans-serif;pointer-events:none">' + lbl + '</text>';
+      svg += '<rect class="trend-bar hist-bar" data-key="' + m.key + '" data-amount="' + m.spent.toFixed(2) + '" x="' + labelW + '" y="' + y + '" width="' + barLen + '" height="' + rowH + '" rx="4" style="fill:' + accent + ';opacity:' + (isCurrent ? '1' : '0.55') + '"><title>' + monthLabel(m.key) + ': ' + currency.format(m.spent) + '</title></rect>';
+      svg += '<text x="' + (labelW + barLen + 8) + '" y="' + (y + rowH / 2 + 4) + '" text-anchor="start" style="font-size:11px;font-weight:500;fill:var(--text-primary);font-family:\'Work Sans\',sans-serif;pointer-events:none">' + currency.format(m.spent) + '</text>';
+    });
+    svg += '</svg>';
+    var lastTap = state.histCaption && state.histCaption[tracker];
+    var captionText = lastTap ? (monthLabel(lastTap.key) + ": " + currency.format(lastTap.amount)) : "Tap a bar to see that month’s total.";
+    var html = '<section>';
+    html += '  <div class="section-head"><span class="section-title">📈 6-month history</span><span class="section-hint">' + (tracker === "personal" ? "Tap a bar to jump to that month" : "Total spend by month") + '</span></div>';
+    html += '  <div class="card trend-wrap">' + svg + '<div class="trend-caption" id="hist-caption-' + tracker + '">' + captionText + '</div></div>';
+    html += '</section>';
+    return html;
+  }
+
+  function renderVendorsSummaryCard(){
+    var items = (state.vendors.wedding && state.vendors.wedding.items) || [];
+    var total = items.reduce(function(s, v){ return s + (Number(v.total) || 0); }, 0);
+    var paid = items.reduce(function(s, v){ return s + (Number(v.paid) || 0); }, 0);
+    var html = '<section>';
+    html += '  <div class="dash-links">';
+    html += '    <button type="button" class="dash-link-card" data-action="nav" data-tracker="wedding" data-page="manage"><div class="dl-title">🏛️ Vendors: ' + (items.length ? (currency.format(paid) + ' paid of ' + currency.format(total)) : 'none added yet') + ' →</div><div class="dl-sub">Track deposits and balances due per vendor</div></button>';
+    html += '  </div>';
+    html += '</section>';
+    return html;
+  }
+
+  function renderCategoryDetail(tracker, name){
+    var monthKey = monthKeyFor(tracker);
+    var totals = categoryTotals(tracker, monthKey);
+    var idx = totals.findIndex(function(t){ return t.name === name; });
+    var cat = idx >= 0 ? totals[idx] : { name: name, budget: 0, spent: 0 };
+    var swatchVar = seriesVarFor(idx < 0 ? 0 : idx);
+    var remaining = cat.budget - cat.spent;
+    var st = statusFor(cat.spent, cat.budget);
+    var statusLabel = st === "critical" ? "Over budget" : st === "warning" ? "Near limit" : "On track";
+    var txs = state.expenses.filter(function(e){ return e.tracker === tracker && e.category === name && inMonth(e.date, monthKey); })
+      .slice().sort(function(a,b){ return (b.date||"").localeCompare(a.date||""); });
+
+    var html = '<button type="button" class="back-link" data-action="nav" data-tracker="' + tracker + '" data-page="dashboard">← Dashboard</button>';
+    html += '<section>';
+    html += '  <div class="section-head"><span class="section-title" style="display:flex;align-items:center;gap:8px"><span class="swatch" style="width:10px;height:10px;border-radius:50%;display:inline-block;background:var(' + swatchVar + ')"></span>' + escapeHtml(name) + '</span>' + (monthKey ? '<span class="section-hint">' + monthLabel(monthKey) + '</span>' : '<span class="section-hint">All-time</span>') + '</div>';
+    html += '  <div class="stat-row">';
+    html += statTile("💰 Budgeted", currency.format(cat.budget));
+    html += statTile("💸 Spent", currency.format(cat.spent), cat.milesSpent > 0 ? '<div class="section-hint" style="margin-top:6px">✈️ ' + currency.format(cat.milesSpent) + ' of that paid in miles</div>' : '');
+    html += statTile(remaining < 0 ? "Over by" : "Remaining", currency.format(Math.abs(remaining)), '<span class="status-chip ' + st + '"><span class="dot"></span>' + statusLabel + '</span>');
+    html += '  </div>';
+    html += '  <p class="section-hint" style="margin-top:10px">To change this category&#39;s budget or remove it, use <button type="button" class="back-link" style="margin:0;display:inline" data-action="nav" data-tracker="' + tracker + '" data-page="manage">Manage →</button></p>';
+    html += '</section>';
+
+    var subTotals = subcategoryTotals(tracker, name, monthKey).filter(function(t){ return t.spent > 0; });
+    if(subTotals.length){
+      subTotals.sort(function(a, b){ return b.spent - a.spent; });
+      html += '<section>';
+      html += '  <div class="section-head"><span class="section-title">🏷️ By subcategory</span></div>';
+      html += '  <div class="card" style="padding:6px 16px">';
+      subTotals.forEach(function(t){
+        html += '<div style="display:flex;justify-content:space-between;align-items:center;padding:8px 0;border-bottom:1px solid var(--border)"><span style="font-size:13.5px' + (t.name === "No subcategory" ? ';color:var(--text-muted)' : '') + '">' + escapeHtml(t.name) + '</span><b style="font-family:\'IBM Plex Mono\',monospace;font-size:13.5px">' + currency.format(t.spent) + '</b></div>';
+      });
+      html += '  </div>';
+      html += '</section>';
+    }
+
+    var showVendor = hasVendorTags(tracker);
+    html += '<section>';
+    html += '  <div class="section-head"><span class="section-title">📒 Transactions</span></div>';
+    html += '  <div class="card table-scroll">';
+    if(txs.length === 0){
+      html += '<div class="empty-note">No expenses logged in this category' + (monthKey ? ' for ' + monthLabel(monthKey) : '') + '.</div>';
+    } else {
+      html += '<table class="tx-table"><thead><tr><th>Date</th><th>Subcategory</th>' + (showVendor ? '<th>Vendor</th>' : '') + '<th>Payment</th><th>Note</th><th style="text-align:right">Amount</th><th>Receipt</th><th></th></tr></thead><tbody>';
+      txs.forEach(function(e){
+        html += '<tr>';
+        html += '<td class="tx-date">' + fmtDate(e.date) + '</td>';
+        html += '<td class="tx-pm">' + (e.subcategory ? escapeHtml(e.subcategory) : '<span style="color:var(--text-muted)">—</span>') + '</td>';
+        if(showVendor){
+          html += '<td class="tx-pm">' + (vendorLabel(e) ? escapeHtml(vendorLabel(e)) : '—') + '</td>';
+        }
+        html += '<td class="tx-pm">' + escapeHtml(paymentLabel(e)) + '</td>';
+        html += '<td class="tx-note">' + escapeHtml(e.note || "") + '</td>';
+        html += '<td class="tx-amount">' + currencyPrecise.format(Number(e.amount) || 0) + '</td>';
+        html += '<td class="tx-receipt">' + (e.receipt ? ('<img class="receipt-thumb" src="' + e.receipt + '" alt="Receipt" data-action="open-receipt" data-id="' + e.id + '">') : '—') + '</td>';
+        html += '<td class="tx-actions"><button class="row-edit" data-action="edit-expense" data-id="' + e.id + '" title="Edit">Edit</button><button class="row-delete" data-action="delete-expense" data-id="' + e.id + '" title="Delete">Remove</button></td>';
+        html += '</tr>';
+      });
+      html += '</tbody></table>';
+    }
+    html += '  </div>';
+    html += '</section>';
+    return html;
+  }
+
+  function renderLogPage(tracker){
+    var totals = categoryTotals(tracker, null);
+
+    var html = subnavHtml(tracker);
+
+    html += '<section>';
+    html += '  <div class="section-head"><span class="section-title">📝 Log an expense</span></div>';
+    html += '  <div class="card">';
+    if(state.sampleImagesOk){
+      html += '  <div class="scan-row"><button type="button" class="scan-btn" data-action="scan-receipt" data-tracker="' + tracker + '">📷 Scan a receipt to auto-fill</button></div>';
+      html += '  <div class="receipt-preview" id="receipt-preview-' + tracker + '"></div>';
+    }
+    html += '    <form class="entry-form" data-action="add-expense" data-tracker="' + tracker + '">';
+    html += '      <div class="field"><label>Category</label><select name="category">' + totals.map(function(c){ return '<option value="' + escapeHtml(c.name) + '">' + escapeHtml(c.name) + '</option>'; }).join("") + '</select></div>';
+    html += '      <div class="field"><label>Subcategory</label><select name="subcategory" data-role="subcat-select">' + subcategoryOptionsHtml(tracker, totals[0] ? totals[0].name : "", "") + '</select></div>';
+    html += '      <div class="field"><label>Vendor / Payee</label><input type="text" name="vendor" list="vendor-dl-' + tracker + '" placeholder="' + (tracker === "wedding" ? "e.g. Quail Ranch" : "e.g. Amazon, Landlord") + '" maxlength="60"></div>';
+    html += '      <div class="field"><label>Amount</label><input type="number" name="amount" min="0" step="0.01" placeholder="0.00" required></div>';
+    html += '      <div class="field"><label>Date</label><input type="date" name="date" value="' + todayStr() + '"></div>';
+    html += paymentTypeFieldHtml("exp", "cash", "");
+    html += '      <div class="field note-field"><label>Note</label><input type="text" name="note" placeholder="Optional"></div>';
+    html += '      <button type="submit" class="submit-btn">Add</button>';
+    html += vendorDatalistHtml(tracker, "vendor-dl-" + tracker);
+    html += '    </form>';
+    html += '  </div>';
+    html += '</section>';
+
+    html += renderSubscriptionsSection(tracker);
+
+    var f = state.logFilter[tracker];
+    html += '<section>';
+    html += '  <div class="section-head"><span class="section-title">📒 Full transaction log</span></div>';
+    html += '  <div class="card" style="padding:12px 16px;display:flex;gap:10px;flex-wrap:wrap">';
+    html += '    <input type="text" id="log-search-' + tracker + '" placeholder="🔍 Search notes or categories…" value="' + escapeHtml(f.q) + '" style="flex:2 1 180px;font-family:\'Work Sans\',sans-serif;font-size:13.5px;background:var(--surface-2);border:1px solid var(--border-strong);border-radius:7px;padding:7px 10px;color:var(--text-primary)">';
+    html += '    <select id="log-filter-cat-' + tracker + '" style="flex:1 1 130px;font-size:13.5px;background:var(--surface-2);border:1px solid var(--border-strong);border-radius:7px;padding:7px 10px;color:var(--text-primary)"><option value="">All categories</option>' + totals.map(function(c){ return '<option value="' + escapeHtml(c.name) + '"' + (f.category === c.name ? ' selected' : '') + '>' + escapeHtml(c.name) + '</option>'; }).join("") + '</select>';
+    html += '    <select id="log-filter-type-' + tracker + '" style="flex:1 1 130px;font-size:13.5px;background:var(--surface-2);border:1px solid var(--border-strong);border-radius:7px;padding:7px 10px;color:var(--text-primary)"><option value="">All payment types</option>' + PAYMENT_TYPES.map(function(t){ return '<option value="' + t.id + '"' + (f.type === t.id ? ' selected' : '') + '>' + t.emoji + ' ' + t.label + '</option>'; }).join("") + '</select>';
+    html += '  </div>';
+    html += '  <div class="card table-scroll" id="log-table-wrap-' + tracker + '" style="margin-top:10px">' + renderLogTableHtml(tracker) + '</div>';
+    html += '</section>';
+    return html;
+  }
+
+  function filteredLogTxs(tracker){
+    var totals = categoryTotals(tracker, null);
+    var f = state.logFilter[tracker];
+    var txs = state.expenses.filter(function(e){
+      if(e.tracker !== tracker) return false;
+      if(f.category && e.category !== f.category) return false;
+      if(f.type && (e.paymentType || "cash") !== f.type) return false;
+      if(f.q){
+        var q = f.q.toLowerCase();
+        var hay = ((e.note || "") + " " + (e.category || "") + " " + paymentLabel(e)).toLowerCase();
+        if(hay.indexOf(q) === -1) return false;
+      }
+      return true;
+    });
+    return { txs: txs, totals: totals };
+  }
+
+  function renderLogTableHtml(tracker){
+    var found = filteredLogTxs(tracker);
+    var txs = found.txs, totals = found.totals;
+    if(txs.length === 0){
+      return '<div class="empty-note">No matching expenses' + (state.expenses.some(function(e){ return e.tracker === tracker; }) ? ' — try clearing a filter.' : ' yet for this budget.') + '</div>';
+    }
+    var showVendor = hasVendorTags(tracker);
+    var html = '<table class="tx-table"><thead><tr><th>Date</th><th>Category</th>' + (showVendor ? '<th>Vendor</th>' : '') + '<th>Payment</th><th>Note</th><th style="text-align:right">Amount</th><th>Receipt</th><th></th></tr></thead><tbody>';
+    txs.slice(0, 150).forEach(function(e){
+      var catIdx = totals.findIndex(function(t){ return t.name === e.category; });
+      var swatchVar = seriesVarFor(catIdx < 0 ? 0 : catIdx);
+      html += '<tr>';
+      html += '<td class="tx-date">' + fmtDate(e.date) + '</td>';
+      html += '<td class="tx-cat"><span class="swatch" style="background:var(' + swatchVar + ')"></span>' + escapeHtml(e.category) + (e.subcategory ? ' <span style="color:var(--text-muted);font-size:12px">· ' + escapeHtml(e.subcategory) + '</span>' : '') + '</td>';
+      if(showVendor){
+        html += '<td class="tx-pm">' + (vendorLabel(e) ? escapeHtml(vendorLabel(e)) : '—') + '</td>';
+      }
+      html += '<td class="tx-pm">' + escapeHtml(paymentLabel(e)) + '</td>';
+      html += '<td class="tx-note">' + escapeHtml(e.note || "") + '</td>';
+      html += '<td class="tx-amount">' + currencyPrecise.format(Number(e.amount) || 0) + '</td>';
+      html += '<td class="tx-receipt">' + (e.receipt ? ('<img class="receipt-thumb" src="' + e.receipt + '" alt="Receipt" data-action="open-receipt" data-id="' + e.id + '">') : '—') + '</td>';
+      html += '<td class="tx-actions"><button class="row-edit" data-action="edit-expense" data-id="' + e.id + '" title="Edit">Edit</button><button class="row-delete" data-action="delete-expense" data-id="' + e.id + '" title="Delete">Remove</button></td>';
+      html += '</tr>';
+    });
+    html += '</tbody></table>';
+    return html;
+  }
+
+  function updateLogTable(tracker){
+    var wrap = document.getElementById("log-table-wrap-" + tracker);
+    if(wrap) wrap.innerHTML = renderLogTableHtml(tracker);
+  }
+
+  function renderEditExpenseModal(){
+    var e = state.editingExpense;
+    if(!e) return "";
+    var tracker = e.tracker;
+    var totals = categoryTotals(tracker, null);
+    var catOptionsHtml = "";
+    if(e.category && !totals.some(function(c){ return c.name === e.category; })){
+      catOptionsHtml += '<option value="' + escapeHtml(e.category) + '" selected>' + escapeHtml(e.category) + '</option>';
+    }
+    catOptionsHtml += totals.map(function(c){ return '<option value="' + escapeHtml(c.name) + '"' + (c.name === e.category ? ' selected' : '') + '>' + escapeHtml(c.name) + '</option>'; }).join("");
+
+    var html = '<div class="modal-overlay" data-action="close-edit-expense">';
+    html += '  <div class="modal-card">';
+    html += '    <form data-action="save-edit-expense" data-id="' + e.id + '" data-tracker="' + tracker + '">';
+    html += '      <div class="modal-head"><span class="section-title">✎ Edit expense</span><button type="button" class="modal-close" data-action="close-edit-expense-btn" title="Close">✕</button></div>';
+    html += '      <div class="modal-row">';
+    html += '        <div class="field"><label>Category</label><select name="category" data-role="edit-category-select">' + catOptionsHtml + '</select></div>';
+    html += '        <div class="field"><label>Subcategory</label><select name="subcategory" data-role="edit-subcat-select">' + subcategoryOptionsHtml(tracker, e.category, e.subcategory || "") + '</select></div>';
+    html += '      </div>';
+    html += '      <div class="field"><label>Vendor / Payee</label><input type="text" name="vendor" list="vendor-dl-edit" value="' + escapeHtml(vendorLabel(e)) + '" maxlength="60" placeholder="' + (tracker === "wedding" ? "e.g. Quail Ranch" : "e.g. Amazon, Landlord") + '"></div>';
+    html += '      <div class="modal-row">';
+    html += '        <div class="field"><label>Amount</label><input type="number" name="amount" min="0" step="0.01" value="' + (Number(e.amount) || 0) + '" required></div>';
+    html += '        <div class="field"><label>Date</label><input type="date" name="date" value="' + (e.date || todayStr()) + '"></div>';
+    html += '      </div>';
+    html += '      <div class="modal-row">' + paymentTypeFieldHtml("editExp", e.paymentType || "cash", e.cardId || "") + '</div>';
+    html += '      <div class="field"><label>Note</label><input type="text" name="note" value="' + escapeHtml(e.note || "") + '" placeholder="Optional"></div>';
+    html += vendorDatalistHtml(tracker, "vendor-dl-edit");
+    html += '      <div class="modal-actions"><button type="button" class="ghost-btn" data-action="close-edit-expense-btn">Cancel</button><button type="submit" class="submit-btn">Save changes</button></div>';
+    html += '    </form>';
+    html += '  </div>';
+    html += '</div>';
+    return html;
+  }
+
+  function openEditExpense(id){
+    var e = state.expenses.find(function(x){ return x.id === id; });
+    if(!e) return;
+    state.editingExpense = Object.assign({}, e);
+    renderEditModalMount();
+  }
+
+  function closeEditExpense(){
+    state.editingExpense = null;
+    renderEditModalMount();
+  }
+
+  function renderManagePage(tracker){
+    var html = subnavHtml(tracker);
+    html += renderCategoriesManageSection(tracker);
+    html += renderPaymentMethodsSection();
+    if(tracker === "wedding") html += renderVendorsSection();
+    html += renderDataSection();
+    return html;
+  }
+
+  function renderIncomePage(tracker){
+    var html = subnavHtml(tracker);
+    html += renderIncomeSection(tracker);
+    html += renderRecurringIncomeSection(tracker);
+    return html;
+  }
+
+  function renderRecurringIncomeSection(tracker){
+    var items = (state.recurringIncome[tracker] && state.recurringIncome[tracker].items) || [];
+    var sorted = items.slice().sort(function(a, b){ return (a.nextDate || "").localeCompare(b.nextDate || ""); });
+    var types = incomeTypesList();
+    var html = '<section>';
+    html += '  <div class="section-head"><span class="section-title">🔁 Recurring income</span><span class="section-hint">Paychecks and other income that repeats — log each time it lands</span></div>';
+    html += '  <div class="card">';
+    if(sorted.length === 0){
+      html += '<div class="sub-empty">No recurring income set up yet.</div>';
+    } else {
+      html += '<div class="sub-list">';
+      sorted.forEach(function(r){
+        var typeMeta = incomeTypeMeta(r.type || "other");
+        var freqLabel = (INCOME_FREQUENCIES.find(function(f){ return f.id === r.frequency; }) || {}).label || r.frequency;
+        html += '<div class="sub-row">';
+        html += '  <span class="sub-name">' + escapeHtml(r.source) + '</span>';
+        html += '  <span class="sub-cycle-badge">' + escapeHtml(freqLabel) + '</span>';
+        html += '  <span class="sub-meta">' + typeMeta.emoji + ' ' + typeMeta.label + '</span>';
+        html += '  <span class="sub-meta">Next ' + fmtDate(r.nextDate) + '</span>';
+        html += '  <span class="sub-amount" style="color:var(--status-good)">+' + currency.format(r.amount) + '</span>';
+        html += '  <span class="sub-actions"><button class="mini-btn" data-action="log-recurring-income" data-tracker="' + tracker + '" data-id="' + r.id + '">Log payment</button><button class="mini-btn danger" data-action="remove-recurring-income" data-tracker="' + tracker + '" data-id="' + r.id + '">Remove</button></span>';
+        html += '</div>';
+      });
+      html += '</div>';
+    }
+    html += '  <form class="sub-add-form" data-action="add-recurring-income" data-tracker="' + tracker + '">';
+    html += '    <div class="field"><label>Source</label><input type="text" name="source" placeholder="e.g. Paycheck" maxlength="60" required></div>';
+    html += '    <div class="field"><label>Type</label><select name="incomeType">' + types.map(function(t){ return '<option value="' + t.id + '"' + (t.id === "salary" ? ' selected' : '') + '>' + t.emoji + ' ' + t.label + '</option>'; }).join("") + '</select></div>';
+    html += '    <div class="field"><label>Amount</label><input type="number" name="amount" min="0" step="0.01" placeholder="0.00" required></div>';
+    html += '    <div class="field"><label>Frequency</label><select name="frequency">' + INCOME_FREQUENCIES.map(function(f){ return '<option value="' + f.id + '"' + (f.id === "biweekly" ? ' selected' : '') + '>' + f.label + '</option>'; }).join("") + '</select></div>';
+    html += '    <div class="field"><label>Next date</label><input type="date" name="nextDate" value="' + todayStr() + '"></div>';
+    html += '    <button type="submit" class="submit-btn neutral">Add</button>';
+    html += '  </form>';
+    html += '  </div>';
+    html += '</section>';
+    return html;
+  }
+
+  function renderSalaryPage(){
+    var s = state.salarySetup;
+    var calc = computePaycheck();
+    var html = '<section>';
+    html += '  <div class="section-head"><span class="section-title">🧮 Salary & paycheck</span><span class="section-hint">Set your gross pay to see what actually lands each paycheck</span></div>';
+    html += '  <div class="card" style="padding:16px">';
+    html += '    <form class="entry-form" data-action="save-salary" style="margin:0">';
+    html += '      <div class="field"><label>Annual gross salary</label><input type="number" name="annualSalary" min="0" step="0.01" value="' + (s.annualSalary || "") + '" placeholder="0.00"></div>';
+    html += '      <div class="field"><label>Pay frequency</label><select name="payFrequency">' + PAY_FREQUENCIES.map(function(f){ return '<option value="' + f.id + '"' + (f.id === s.payFrequency ? ' selected' : '') + '>' + f.label + ' (' + f.periods + '/yr)</option>'; }).join("") + '</select></div>';
+    html += '      <button type="submit" class="submit-btn neutral">Save</button>';
+    html += '    </form>';
+    html += '  </div>';
+    html += '</section>';
+
+    html += '<section>';
+    html += '  <div class="section-head"><span class="section-title">➖ Deductions</span><span class="section-hint">Taxes, retirement, insurance — as a percent of gross or a flat amount per paycheck</span></div>';
+    html += '  <div class="card">';
+    var deds = s.deductions || [];
+    if(deds.length === 0){
+      html += '<div class="sub-empty">No deductions added yet — your net pay equals gross until you add some.</div>';
+    } else {
+      html += '<div class="sub-list">';
+      calc.deductions.forEach(function(d){
+        if(state.editingDeduction === d.id){
+          html += '<form class="sub-add-form" data-action="save-deduction-edit" data-id="' + d.id + '" style="padding:12px 16px">';
+          html += '  <div class="field"><label>Name</label><input type="text" name="name" value="' + escapeHtml(d.name) + '" maxlength="40" required></div>';
+          html += '  <div class="field"><label>Type</label><select name="kind"><option value="percent"' + (d.kind !== "flat" ? ' selected' : '') + '>% of gross</option><option value="flat"' + (d.kind === "flat" ? ' selected' : '') + '>Flat $ per paycheck</option></select></div>';
+          html += '  <div class="field"><label>Value</label><input type="number" name="value" min="0" step="0.01" value="' + (Number(d.value) || 0) + '" required></div>';
+          html += '  <span class="sub-actions"><button type="button" class="mini-btn" data-action="cancel-edit-deduction">Cancel</button><button type="submit" class="mini-btn">Save</button></span>';
+          html += '</form>';
+        } else {
+          html += '<div class="sub-row">';
+          html += '  <span class="sub-name">' + escapeHtml(d.name) + '</span>';
+          html += '  <span class="sub-meta">' + (d.kind === "percent" ? (Number(d.value) || 0) + '% of gross' : 'Flat amount') + '</span>';
+          html += '  <span class="sub-amount" style="color:var(--status-critical)">−' + currencyPrecise.format(d.amount) + '</span>';
+          html += '  <span class="sub-actions"><button class="mini-btn" data-action="edit-deduction" data-id="' + d.id + '">Edit</button><button class="mini-btn danger" data-action="remove-deduction" data-id="' + d.id + '">Remove</button></span>';
+          html += '</div>';
+        }
+      });
+      html += '</div>';
+    }
+    html += '  <form class="sub-add-form" data-action="add-deduction">';
+    html += '    <div class="field"><label>Name</label><input type="text" name="name" placeholder="e.g. Federal Tax, 401k" maxlength="40" required></div>';
+    html += '    <div class="field"><label>Type</label><select name="kind"><option value="percent">% of gross</option><option value="flat">Flat $ per paycheck</option></select></div>';
+    html += '    <div class="field"><label>Value</label><input type="number" name="value" min="0" step="0.01" placeholder="0.00" required></div>';
+    html += '    <button type="submit" class="submit-btn neutral">+ Add deduction</button>';
+    html += '  </form>';
+    html += '  </div>';
+    html += '</section>';
+
+    html += '<section>';
+    html += '  <div class="section-head"><span class="section-title">💵 Per-paycheck breakdown</span><span class="section-hint">' + calc.freq.label + ' · ' + calc.freq.periods + '/year</span></div>';
+    html += '  <div class="stat-row">';
+    html += statTile("💰 Gross per paycheck", currencyPrecise.format(calc.gross));
+    html += statTile("➖ Total deductions", currencyPrecise.format(calc.totalDeductions));
+    html += statTile("✅ Net per paycheck", currencyPrecise.format(calc.net));
+    html += '  </div>';
+    html += '  <div class="card" style="padding:14px 16px;margin-top:12px;display:flex;flex-direction:column;gap:10px">';
+    html += '    <p class="section-hint" style="margin:0">Annual: ' + currency.format(calc.gross * calc.freq.periods) + ' gross → ' + currency.format(calc.net * calc.freq.periods) + ' net. This is a simplified estimate for planning — not a substitute for a real pay stub or tax advice.</p>';
+    html += '    <div><button type="button" class="ghost-btn" data-action="add-net-as-recurring-income">➕ Add net pay as recurring income (' + (payFrequencyMeta(s.payFrequency).id === "biweekly" ? "bi-weekly" : payFrequencyMeta(s.payFrequency).label.toLowerCase()) + ')</button></div>';
+    html += '  </div>';
+    html += '</section>';
+    return html;
+  }
+
+  function renderIncomeSection(tracker){
+    var items = (state.income[tracker] && state.income[tracker].items) || [];
+    var sorted = items.slice().sort(function(a, b){ return (b.date || "").localeCompare(a.date || ""); });
+    var total = items.reduce(function(s, i){ return s + (Number(i.amount) || 0); }, 0);
+    var typeTotals = incomeTypeTotals(tracker, null);
+    var types = incomeTypesList();
+    var html = '<section>';
+    html += '  <div class="section-head"><span class="section-title">📥 Income</span><span class="section-hint">' + (items.length ? currency.format(total) + ' logged total' : (tracker === "wedding" ? "Gifts, contributions, or cash toward the wedding" : "Paychecks, bonuses, gifts, or other money coming in")) + '</span></div>';
+    html += '  <div class="card">';
+    if(items.length > 0){
+      html += '  <div class="ptype-row" style="padding:14px 16px 0;grid-template-columns:repeat(' + Math.min(types.length, 4) + ',1fr)">';
+      types.forEach(function(t){
+        html += '<div class="ptype-tile"><div class="ptype-label">' + t.emoji + ' ' + t.label + '</div><div class="ptype-value">' + currency.format(typeTotals[t.id] || 0) + '</div></div>';
+      });
+      html += '  </div>';
+    }
+    if(sorted.length === 0){
+      html += '<div class="sub-empty">No income logged yet.</div>';
+    } else {
+      html += '<div class="sub-list">';
+      sorted.forEach(function(i){
+        var typeMeta = incomeTypeMeta(i.type || "other");
+        html += '<div class="sub-row">';
+        html += '  <span class="sub-name">' + escapeHtml(i.source) + '</span>';
+        html += '  <span class="sub-meta">' + typeMeta.emoji + ' ' + typeMeta.label + '</span>';
+        html += '  <span class="sub-meta">' + fmtDate(i.date) + '</span>';
+        if(i.note) html += '  <span class="sub-meta">' + escapeHtml(i.note) + '</span>';
+        html += '  <span class="sub-amount" style="color:var(--status-good)">+' + currency.format(i.amount) + '</span>';
+        html += '  <span class="sub-actions"><button class="mini-btn danger" data-action="remove-income" data-tracker="' + tracker + '" data-id="' + i.id + '">Remove</button></span>';
+        html += '</div>';
+      });
+      html += '</div>';
+    }
+    html += '  <form class="sub-add-form" data-action="add-income" data-tracker="' + tracker + '">';
+    html += '    <div class="field"><label>Source</label><input type="text" name="source" placeholder="' + (tracker === "wedding" ? "e.g. Parents' contribution" : "e.g. Paycheck") + '" maxlength="60" required></div>';
+    html += '    <div class="field"><label>Type</label><select name="incomeType">' + types.map(function(t){ return '<option value="' + t.id + '">' + t.emoji + ' ' + t.label + '</option>'; }).join("") + '</select></div>';
+    html += '    <div class="field"><label>Amount</label><input type="number" name="amount" min="0" step="0.01" placeholder="0.00" required></div>';
+    html += '    <div class="field"><label>Date</label><input type="date" name="date" value="' + todayStr() + '"></div>';
+    html += '    <div class="field note-field"><label>Note</label><input type="text" name="note" placeholder="Optional"></div>';
+    html += '    <button type="submit" class="submit-btn neutral">Add</button>';
+    html += '  </form>';
+    html += '  <div class="cat-subrow" style="border-bottom:none">';
+    html += '    <div class="section-hint" style="margin:0 0 2px">Income types</div>';
+    html += '    <div class="subcat-chip-row">';
+    types.forEach(function(t){
+      html += '<span class="subcat-chip">' + t.emoji + ' ' + escapeHtml(t.label) + '<button type="button" class="subcat-chip-remove" data-action="remove-income-type" data-id="' + t.id + '" title="Remove type">✕</button></span>';
+    });
+    html += '    </div>';
+    html += '    <form class="subcat-add-inline" data-action="add-income-type">';
+    html += '      <input type="text" name="emoji" placeholder="🙂" maxlength="4" style="flex:0 1 60px;text-align:center">';
+    html += '      <input type="text" name="label" placeholder="New income type" maxlength="24" required>';
+    html += '      <button type="submit" class="ghost-btn">+ Add type</button>';
+    html += '    </form>';
+    html += '  </div>';
+    html += '  </div>';
+    html += '</section>';
+    return html;
+  }
+
+  function vendorStatus(v){
+    var balance = (Number(v.total) || 0) - (Number(v.paid) || 0);
+    if(balance <= 0) return { label: "Paid in full", cls: "good" };
+    if(v.dueDate && v.dueDate < todayStr()) return { label: "Past due", cls: "critical" };
+    if(v.dueDate){
+      var days = Math.round((new Date(v.dueDate) - new Date(todayStr())) / 86400000);
+      if(days <= 14) return { label: "Due soon", cls: "warning" };
+    }
+    return { label: "Deposit pending", cls: "warning" };
+  }
+
+  function renderVendorsSection(){
+    var items = (state.vendors.wedding && state.vendors.wedding.items) || [];
+    var totals = categoryTotals("wedding", null);
+    var totalContracted = items.reduce(function(s, v){ return s + (Number(v.total) || 0); }, 0);
+    var totalPaid = items.reduce(function(s, v){ return s + (Number(v.paid) || 0); }, 0);
+    var html = '<section>';
+    html += '  <div class="section-head"><span class="section-title">🏛️ Vendors & deposits</span><span class="section-hint">' + (items.length ? (currency.format(totalPaid) + ' paid of ' + currency.format(totalContracted) + ' contracted') : 'Track each vendor’s deposit and balance due') + '</span></div>';
+    html += '  <div class="card">';
+    if(items.length === 0){
+      html += '<div class="sub-empty">No vendors added yet.</div>';
+    } else {
+      html += '<div class="sub-list">';
+      items.forEach(function(v){
+        var balance = (Number(v.total) || 0) - (Number(v.paid) || 0);
+        var st = vendorStatus(v);
+        html += '<div class="sub-row">';
+        html += '  <span class="sub-name">' + escapeHtml(v.name) + '</span>';
+        html += '  <span class="sub-meta">' + escapeHtml(v.category || "Uncategorized") + '</span>';
+        html += '  <span class="sub-meta">Due ' + (v.dueDate ? fmtDate(v.dueDate) : "—") + '</span>';
+        html += '  <span class="status-chip ' + st.cls + '" style="margin-top:0"><span class="dot"></span>' + st.label + '</span>';
+        html += '  <span class="sub-amount">' + currency.format(v.paid) + ' / ' + currency.format(v.total) + '<div class="section-hint" style="text-align:right">' + (balance > 0 ? currency.format(balance) + ' due' : 'settled') + '</div></span>';
+        html += '  <span class="sub-actions">';
+        html += '    <input type="number" min="0" step="0.01" placeholder="Amount" class="budget-edit-input" style="width:90px" data-role="vendor-pay-amount" data-id="' + v.id + '">';
+        html += '    <button class="mini-btn" data-action="log-vendor-payment" data-id="' + v.id + '">Log payment</button>';
+        html += '    <button class="mini-btn danger" data-action="remove-vendor" data-id="' + v.id + '">Remove</button>';
+        html += '  </span>';
+        html += '</div>';
+      });
+      html += '</div>';
+    }
+    html += '  <form class="sub-add-form" data-action="add-vendor">';
+    html += '    <div class="field"><label>Vendor name</label><input type="text" name="name" placeholder="e.g. Quail Ranch" maxlength="60" required></div>';
+    html += '    <div class="field"><label>Category</label><select name="category">' + totals.map(function(c){ return '<option value="' + escapeHtml(c.name) + '">' + escapeHtml(c.name) + '</option>'; }).join("") + '</select></div>';
+    html += '    <div class="field"><label>Total contract</label><input type="number" name="total" min="0" step="0.01" placeholder="0.00" required></div>';
+    html += '    <div class="field"><label>Paid so far</label><input type="number" name="paid" min="0" step="0.01" placeholder="0.00"></div>';
+    html += '    <div class="field"><label>Balance due date</label><input type="date" name="dueDate"></div>';
+    html += paymentTypeFieldHtml("vendor", "credit", "");
+    html += '    <button type="submit" class="submit-btn neutral">Add vendor</button>';
+    html += '  </form>';
+    html += '  </div>';
+    html += '</section>';
+    return html;
+  }
+
+  function renderDataSection(){
+    var html = '<section>';
+    html += '  <div class="section-head"><span class="section-title">🗃️ Your data</span><span class="section-hint">Export your transactions, bulk-import from a bank CSV, or back up everything</span></div>';
+    html += '  <div class="card" style="padding:16px;display:flex;flex-direction:column;gap:14px">';
+    html += '    <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:center">';
+    html += '      <button type="button" class="ghost-btn" data-action="export-csv">📤 Export all transactions (CSV)</button>';
+    html += '      <label class="ghost-btn" style="cursor:pointer">📥 Import from bank CSV<input type="file" id="csv-file-input" accept=".csv,text/csv" hidden></label>';
+    html += '    </div>';
+    if(state.exportText){
+      html += '    <div><div class="section-hint" style="margin-bottom:6px">Downloading isn’t available in this view — copy the text below and save it as a .csv file yourself.</div><textarea readonly style="width:100%;height:120px;font-family:\'IBM Plex Mono\',monospace;font-size:12px;background:var(--surface-2);border:1px solid var(--border-strong);border-radius:7px;padding:8px" onclick="this.select()">' + escapeHtml(state.exportText) + '</textarea></div>';
+    }
+    html += renderImportPreview();
+
+    html += '    <div style="border-top:1px solid var(--border);padding-top:14px;display:flex;flex-direction:column;gap:10px">';
+    html += '      <div class="section-hint">Full backup — every category, budget, subscription, income source, salary setup, vendor, and expense in one file. Keep a copy somewhere safe, or use it to bulk-load data without risking what&#39;s already here.</div>';
+    html += '      <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:center">';
+    html += '        <button type="button" class="ghost-btn" data-action="export-backup">📦 Export full backup (JSON)</button>';
+    html += '        <label class="ghost-btn" style="cursor:pointer">📥 Restore from backup<input type="file" id="backup-file-input" accept=".json,application/json" hidden></label>';
+    html += '      </div>';
+    if(state.backupExportText){
+      html += '      <div><div class="section-hint" style="margin-bottom:6px">Downloading isn’t available in this view — copy the text below and save it as a .json file yourself.</div><textarea readonly style="width:100%;height:120px;font-family:\'IBM Plex Mono\',monospace;font-size:12px;background:var(--surface-2);border:1px solid var(--border-strong);border-radius:7px;padding:8px" onclick="this.select()">' + escapeHtml(state.backupExportText) + '</textarea></div>';
+    }
+    html += renderBackupImportPreview();
+    html += '    </div>';
+    html += '  </div>';
+    html += '</section>';
+    return html;
+  }
+
+  function renderBackupImportPreview(){
+    if(state.backupImportError){
+      return '<div class="section-hint" style="color:var(--status-critical)">' + escapeHtml(state.backupImportError) + '</div>';
+    }
+    if(!state.backupImportPreview) return '';
+    var p = state.backupImportPreview;
+    var c = p.counts;
+    var html = '<div style="border-top:1px solid var(--border);padding-top:12px">';
+    html += '<div class="section-hint" style="margin-bottom:10px">This backup' + (p.exportedAt ? (' was made ' + fmtDate(String(p.exportedAt).slice(0, 10))) : '') + ' and contains <b style="color:var(--text-primary)">' + c.expenses + '</b> expense' + (c.expenses === 1 ? '' : 's') + ', <b style="color:var(--text-primary)">' + c.personalCategories + '</b> personal categories, <b style="color:var(--text-primary)">' + c.weddingCategories + '</b> wedding categories' + (c.subscriptions ? ', ' + c.subscriptions + ' subscriptions' : '') + (c.vendors ? ', ' + c.vendors + ' vendors' : '') + '. Restoring will <b>replace</b> your current categories, budgets, subscriptions, income setup, salary, and vendors with what&#39;s in this file, and will <b>add</b> any expenses not already logged — expenses you already have are left untouched, nothing is deleted.</div>';
+    html += '<div style="display:flex;gap:8px"><button type="button" class="submit-btn neutral" data-action="confirm-backup-import">✅ Restore this backup</button><button type="button" class="ghost-btn" data-action="cancel-backup-import">Cancel</button></div>';
+    html += '</div>';
+    return html;
+  }
+
+  function renderImportPreview(){
+    if(!state.importPreview) return '';
+    var p = state.importPreview;
+    var totals = categoryTotals(p.tracker, null);
+    var html = '<div style="border-top:1px solid var(--border);padding-top:14px">';
+    html += '<div class="section-hint" style="margin-bottom:10px">Found ' + p.rows.length + ' transactions in <b style="color:var(--text-primary)">' + (p.tracker === "wedding" ? "Wedding" : "Personal") + '</b> as <b style="color:var(--text-primary)">' + paymentTypeMeta(p.type).emoji + ' ' + paymentTypeMeta(p.type).label + '</b>. Review categories, uncheck any you don’t want, then import.</div>';
+    html += '<div class="table-scroll"><table class="tx-table"><thead><tr><th></th><th>Date</th><th>Description</th><th style="text-align:right">Amount</th><th>Category</th></tr></thead><tbody>';
+    p.rows.forEach(function(r, i){
+      html += '<tr>';
+      html += '<td><input type="checkbox" data-role="import-row-toggle" data-idx="' + i + '"' + (r.include ? ' checked' : '') + '></td>';
+      html += '<td class="tx-date">' + fmtDate(r.date) + '</td>';
+      html += '<td class="tx-note">' + escapeHtml(r.note) + '</td>';
+      html += '<td class="tx-amount">' + currencyPrecise.format(r.amount) + '</td>';
+      html += '<td><select data-role="import-row-category" data-idx="' + i + '">' + totals.map(function(c){ return '<option value="' + escapeHtml(c.name) + '"' + (c.name === r.category ? ' selected' : '') + '>' + escapeHtml(c.name) + '</option>'; }).join("") + '</select></td>';
+      html += '</tr>';
+    });
+    html += '</tbody></table></div>';
+    html += '<div style="display:flex;gap:8px;margin-top:12px"><button type="button" class="submit-btn neutral" data-action="confirm-import">✅ Import selected</button><button type="button" class="ghost-btn" data-action="cancel-import">Cancel</button></div>';
+    html += '</div>';
+    return html;
+  }
+
+  function renderPanel(tracker){
+    var panel = document.getElementById(tracker + "-panel");
+    var html = "";
+    if(state.page === "detail" && state.detailCategory){
+      html = renderCategoryDetail(tracker, state.detailCategory);
+    } else if(state.page === "log"){
+      html = renderLogPage(tracker);
+    } else if(state.page === "income"){
+      html = renderIncomePage(tracker);
+    } else if(state.page === "manage"){
+      html = renderManagePage(tracker);
+    } else if(state.page === "salary" && tracker === "personal"){
+      html = subnavHtml(tracker) + renderSalaryPage();
+    } else {
+      html = subnavHtml(tracker) + renderDashboard(tracker);
+    }
+    panel.innerHTML = html;
+  }
+
+  // ---------- events ----------
+
+  document.addEventListener("click", function(ev){
+    var tabBtn = ev.target.closest(".tab");
+    if(tabBtn){
+      state.tracker = tabBtn.dataset.tracker;
+      if(state.page === "detail"){ state.page = "dashboard"; state.detailCategory = null; }
+      if(state.page === "salary" && state.tracker !== "personal"){ state.page = "dashboard"; }
+      render();
+      return;
+    }
+    var navBtn = ev.target.closest('[data-action="nav"]');
+    if(navBtn){
+      state.page = navBtn.dataset.page;
+      state.detailCategory = null;
+      state.editingCategory = null;
+      render();
+      return;
+    }
+    var openCatBtn = ev.target.closest('[data-action="open-category"]');
+    if(openCatBtn){
+      state.page = "detail";
+      state.detailCategory = openCatBtn.dataset.name;
+      render();
+      return;
+    }
+    var monthPrev = ev.target.closest('[data-action="month-prev"]');
+    if(monthPrev){ state.personalMonth = shiftMonth(state.personalMonth, -1); render(); return; }
+    var monthNext = ev.target.closest('[data-action="month-next"]');
+    if(monthNext){ state.personalMonth = shiftMonth(state.personalMonth, 1); render(); return; }
+
+    var editBtn = ev.target.closest('[data-action="edit-budget"]');
+    if(editBtn){
+      state.editingCategory = { tracker: editBtn.dataset.tracker, name: editBtn.dataset.name };
+      renderPanel(state.tracker);
+      var input = document.querySelector('[data-role="budget-input"]');
+      if(input){ input.focus(); input.select(); }
+      return;
+    }
+    var saveBtn = ev.target.closest('[data-action="save-budget"]');
+    if(saveBtn){
+      commitBudgetEdit(saveBtn.dataset.tracker, saveBtn.dataset.name);
+      return;
+    }
+    var toggleSubBtn = ev.target.closest('[data-action="toggle-subcats"]');
+    if(toggleSubBtn){
+      var tSub = toggleSubBtn.dataset.tracker, nSub = toggleSubBtn.dataset.name;
+      var already = state.expandedCategory && state.expandedCategory.tracker === tSub && state.expandedCategory.name === nSub;
+      state.expandedCategory = already ? null : { tracker: tSub, name: nSub };
+      renderPanel(state.tracker);
+      return;
+    }
+    var removeSubcatBtn = ev.target.closest('[data-action="remove-subcategory"]');
+    if(removeSubcatBtn){
+      removeSubcategory(removeSubcatBtn.dataset.tracker, removeSubcatBtn.dataset.category, removeSubcatBtn.dataset.sub);
+      return;
+    }
+    var delBtn = ev.target.closest('[data-action="delete-expense"]');
+    if(delBtn){
+      deleteExpense(delBtn.dataset.id);
+      return;
+    }
+    var editExpBtn = ev.target.closest('[data-action="edit-expense"]');
+    if(editExpBtn){
+      openEditExpense(editExpBtn.dataset.id);
+      return;
+    }
+    var closeEditBtn = ev.target.closest('[data-action="close-edit-expense-btn"]');
+    if(closeEditBtn){
+      closeEditExpense();
+      return;
+    }
+    var editOverlay = ev.target.closest('[data-action="close-edit-expense"]');
+    if(editOverlay && ev.target === editOverlay){
+      closeEditExpense();
+      return;
+    }
+    var reloadBtn = ev.target.closest('[data-action="reload-page"]');
+    if(reloadBtn){
+      location.reload();
+      return;
+    }
+    var connectDriveBtn = ev.target.closest('[data-action="connect-drive"]');
+    if(connectDriveBtn){
+      connectDrive();
+      return;
+    }
+    var removeCardBtn = ev.target.closest('[data-action="remove-card"]');
+    if(removeCardBtn){
+      removePaymentMethod(removeCardBtn.dataset.id);
+      return;
+    }
+    var logSubBtn = ev.target.closest('[data-action="log-subscription"]');
+    if(logSubBtn){
+      logSubscriptionPayment(logSubBtn.dataset.tracker, logSubBtn.dataset.id);
+      return;
+    }
+    var removeSubBtn = ev.target.closest('[data-action="remove-subscription"]');
+    if(removeSubBtn){
+      removeSubscription(removeSubBtn.dataset.tracker, removeSubBtn.dataset.id);
+      return;
+    }
+    var removeIncomeBtn = ev.target.closest('[data-action="remove-income"]');
+    if(removeIncomeBtn){
+      removeIncome(removeIncomeBtn.dataset.tracker, removeIncomeBtn.dataset.id);
+      return;
+    }
+    var removeIncomeTypeBtn = ev.target.closest('[data-action="remove-income-type"]');
+    if(removeIncomeTypeBtn){
+      removeIncomeType(removeIncomeTypeBtn.dataset.id);
+      return;
+    }
+    var logRecIncBtn = ev.target.closest('[data-action="log-recurring-income"]');
+    if(logRecIncBtn){
+      logRecurringIncomePayment(logRecIncBtn.dataset.tracker, logRecIncBtn.dataset.id);
+      return;
+    }
+    var removeRecIncBtn = ev.target.closest('[data-action="remove-recurring-income"]');
+    if(removeRecIncBtn){
+      removeRecurringIncome(removeRecIncBtn.dataset.tracker, removeRecIncBtn.dataset.id);
+      return;
+    }
+    var addNetIncomeBtn = ev.target.closest('[data-action="add-net-as-recurring-income"]');
+    if(addNetIncomeBtn){
+      var calc0 = computePaycheck();
+      addRecurringIncome("personal", {
+        source: "Salary (net)",
+        type: "salary",
+        amount: Math.round(calc0.net * 100) / 100,
+        frequency: state.salarySetup.payFrequency,
+        nextDate: todayStr()
+      });
+      state.page = "manage";
+      render();
+      return;
+    }
+    var removeDedBtn = ev.target.closest('[data-action="remove-deduction"]');
+    if(removeDedBtn){
+      var newDeductions = (state.salarySetup.deductions || []).filter(function(d){ return d.id !== removeDedBtn.dataset.id; });
+      saveSalarySetup({ annualSalary: state.salarySetup.annualSalary, payFrequency: state.salarySetup.payFrequency, deductions: newDeductions });
+      return;
+    }
+    var editDedBtn = ev.target.closest('[data-action="edit-deduction"]');
+    if(editDedBtn){
+      state.editingDeduction = editDedBtn.dataset.id;
+      renderPanel(state.tracker);
+      return;
+    }
+    var cancelEditDedBtn = ev.target.closest('[data-action="cancel-edit-deduction"]');
+    if(cancelEditDedBtn){
+      state.editingDeduction = null;
+      renderPanel(state.tracker);
+      return;
+    }
+    var removeVendorBtn = ev.target.closest('[data-action="remove-vendor"]');
+    if(removeVendorBtn){
+      removeVendor(removeVendorBtn.dataset.id);
+      return;
+    }
+    var logVendorBtn = ev.target.closest('[data-action="log-vendor-payment"]');
+    if(logVendorBtn){
+      var amtInput = document.querySelector('[data-role="vendor-pay-amount"][data-id="' + logVendorBtn.dataset.id + '"]');
+      var amt = amtInput ? parseFloat(amtInput.value) : NaN;
+      if(!amt || amt <= 0) return;
+      logVendorPayment(logVendorBtn.dataset.id, amt);
+      return;
+    }
+    var exportBtn = ev.target.closest('[data-action="export-csv"]');
+    if(exportBtn){
+      exportCsv();
+      return;
+    }
+    var exportBackupBtn = ev.target.closest('[data-action="export-backup"]');
+    if(exportBackupBtn){
+      exportBackup();
+      return;
+    }
+    var confirmBackupBtn = ev.target.closest('[data-action="confirm-backup-import"]');
+    if(confirmBackupBtn){
+      confirmBackupImport();
+      return;
+    }
+    var cancelBackupBtn = ev.target.closest('[data-action="cancel-backup-import"]');
+    if(cancelBackupBtn){
+      state.backupImportPreview = null;
+      state.backupImportError = null;
+      render();
+      return;
+    }
+    var confirmImportBtn = ev.target.closest('[data-action="confirm-import"]');
+    if(confirmImportBtn){
+      confirmImport();
+      return;
+    }
+    var cancelImportBtn = ev.target.closest('[data-action="cancel-import"]');
+    if(cancelImportBtn){
+      state.importPreview = null;
+      render();
+      return;
+    }
+    var scanBtn = ev.target.closest('[data-action="scan-receipt"]');
+    if(scanBtn){
+      state.scanTracker = scanBtn.dataset.tracker;
+      document.getElementById("receipt-file-input").click();
+      return;
+    }
+    var clearReceiptBtn = ev.target.closest('[data-action="clear-receipt"]');
+    if(clearReceiptBtn){
+      var t = clearReceiptBtn.dataset.tracker;
+      state.pendingReceipt[t] = null;
+      var box = document.getElementById("receipt-preview-" + t);
+      if(box) box.innerHTML = "";
+      return;
+    }
+    var histBar = ev.target.closest(".hist-bar");
+    if(histBar){
+      var histKey = histBar.dataset.key;
+      var histAmt = Number(histBar.dataset.amount) || 0;
+      state.histCaption[state.tracker] = { key: histKey, amount: histAmt };
+      if(state.tracker === "personal"){
+        state.personalMonth = histKey;
+        state.page = "dashboard";
+        render();
+      } else {
+        var histCaption = document.getElementById("hist-caption-" + state.tracker);
+        if(histCaption) histCaption.textContent = monthLabel(histKey) + ": " + currency.format(histAmt);
+      }
+      return;
+    }
+    var trendBar = ev.target.closest(".trend-bar");
+    if(trendBar){
+      var caption = document.getElementById("trend-caption-" + state.tracker);
+      if(caption) caption.textContent = fmtDate(trendBar.dataset.date) + ": " + currency.format(Number(trendBar.dataset.amount) || 0);
+      return;
+    }
+    var cashflowBar = ev.target.closest(".cashflow-bar");
+    if(cashflowBar){
+      var cfCaption = document.getElementById("cashflow-caption-" + state.tracker);
+      if(cfCaption){
+        var cfKey = cashflowBar.dataset.key;
+        cfCaption.textContent = monthLabel(cfKey) + ": " + currency.format(Number(cashflowBar.dataset.spent) || 0) + " spent · " + currency.format(Number(cashflowBar.dataset.income) || 0) + " income";
+      }
+      return;
+    }
+    var receiptImg = ev.target.closest('[data-action="open-receipt"]');
+    if(receiptImg){
+      var exp = state.expenses.find(function(e){ return e.id === receiptImg.dataset.id; });
+      if(exp && exp.receipt){
+        document.getElementById("lightbox-img").src = exp.receipt;
+        document.getElementById("lightbox").hidden = false;
+      }
+      return;
+    }
+    if(ev.target.closest("#lightbox")){
+      document.getElementById("lightbox").hidden = true;
+      return;
+    }
+  });
+
+  document.addEventListener("change", function(ev){
+    if(ev.target.matches('[data-role="ptype-select"]')){
+      var form = ev.target.closest("form");
+      var cardField = form && form.querySelector('[data-role="card-field"]');
+      if(!cardField) return;
+      var needsCard = paymentTypeMeta(ev.target.value).needsCard;
+      cardField.style.display = needsCard ? "" : "none";
+      var sel = cardField.querySelector("select");
+      if(sel){ sel.required = needsCard; if(!needsCard) sel.value = ""; }
+      return;
+    }
+    if(ev.target.name === "category" && ev.target.closest('[data-action="add-expense"]')){
+      var expForm = ev.target.closest('[data-action="add-expense"]');
+      var subSel = expForm.querySelector('[data-role="subcat-select"]');
+      if(subSel) subSel.innerHTML = subcategoryOptionsHtml(expForm.dataset.tracker, ev.target.value, "");
+      return;
+    }
+    if(ev.target.name === "category" && ev.target.closest('[data-action="save-edit-expense"]')){
+      var editExpForm = ev.target.closest('[data-action="save-edit-expense"]');
+      var editSubSel = editExpForm.querySelector('[data-role="edit-subcat-select"]');
+      if(editSubSel) editSubSel.innerHTML = subcategoryOptionsHtml(editExpForm.dataset.tracker, ev.target.value, "");
+      return;
+    }
+    if(ev.target.matches('[data-role="import-row-toggle"]')){
+      if(state.importPreview) state.importPreview.rows[Number(ev.target.dataset.idx)].include = ev.target.checked;
+      return;
+    }
+    if(ev.target.matches('[data-role="import-row-category"]')){
+      if(state.importPreview) state.importPreview.rows[Number(ev.target.dataset.idx)].category = ev.target.value;
+      return;
+    }
+    if(ev.target.id === "csv-file-input"){
+      var file = ev.target.files && ev.target.files[0];
+      ev.target.value = "";
+      if(file) handleCsvImport(file);
+      return;
+    }
+    if(ev.target.id === "backup-file-input"){
+      var bfile = ev.target.files && ev.target.files[0];
+      ev.target.value = "";
+      if(bfile) handleBackupJsonImport(bfile);
+      return;
+    }
+    var catMatch = ev.target.id.match(/^log-filter-cat-(personal|wedding)$/);
+    if(catMatch){ state.logFilter[catMatch[1]].category = ev.target.value; updateLogTable(catMatch[1]); return; }
+    var typeMatch = ev.target.id.match(/^log-filter-type-(personal|wedding)$/);
+    if(typeMatch){ state.logFilter[typeMatch[1]].type = ev.target.value; updateLogTable(typeMatch[1]); return; }
+  });
+
+  document.addEventListener("input", function(ev){
+    var searchMatch = ev.target.id.match(/^log-search-(personal|wedding)$/);
+    if(searchMatch){
+      var tr2 = searchMatch[1];
+      state.logFilter[tr2].q = ev.target.value;
+      clearTimeout(state.logFilter[tr2]._t);
+      state.logFilter[tr2]._t = setTimeout(function(){ updateLogTable(tr2); }, 120);
+    }
+  });
+
+  document.addEventListener("keydown", function(ev){
+    if(ev.key === "Enter" && ev.target.matches('[data-role="budget-input"]')){
+      ev.preventDefault();
+      commitBudgetEdit(ev.target.dataset.tracker, ev.target.dataset.name);
+    }
+    if(ev.key === "Escape"){
+      var lb = document.getElementById("lightbox");
+      if(lb && !lb.hidden) lb.hidden = true;
+      if(state.editingExpense) closeEditExpense();
+    }
+  });
+
+  document.addEventListener("submit", function(ev){
+    var expenseForm = ev.target.closest('[data-action="add-expense"]');
+    if(expenseForm){
+      ev.preventDefault();
+      var tracker = expenseForm.dataset.tracker;
+      var data = new FormData(expenseForm);
+      var amount = parseFloat(data.get("amount"));
+      if(!amount || amount <= 0) return;
+      var typedVendor = (data.get("vendor") || "").toString().trim().slice(0, 60);
+      var matchedVendorId = null;
+      if(tracker === "wedding" && typedVendor){
+        var vmatch = (state.vendors.wedding.items || []).find(function(v){ return v.name.toLowerCase() === typedVendor.toLowerCase(); });
+        if(vmatch) matchedVendorId = vmatch.id;
+      }
+      var expense = {
+        tracker: tracker,
+        category: data.get("category"),
+        subcategory: (data.get("subcategory") || "").toString().trim().slice(0, 30) || null,
+        vendor: typedVendor || null,
+        vendorId: matchedVendorId,
+        amount: amount,
+        date: data.get("date") || todayStr(),
+        note: (data.get("note") || "").toString().slice(0, 200),
+        paymentType: data.get("expType") || "cash",
+        cardId: data.get("expCard") || null,
+        createdAt: new Date().toISOString()
+      };
+      if(state.pendingReceipt[tracker]){
+        expense.receipt = state.pendingReceipt[tracker];
+        state.pendingReceipt[tracker] = null;
+        var box = document.getElementById("receipt-preview-" + tracker);
+        if(box) box.innerHTML = "";
+      }
+      addExpense(expense);
+      expenseForm.reset();
+      render();
+      return;
+    }
+    var editExpenseForm = ev.target.closest('[data-action="save-edit-expense"]');
+    if(editExpenseForm){
+      ev.preventDefault();
+      var eid = editExpenseForm.dataset.id;
+      var etr = editExpenseForm.dataset.tracker;
+      var edata = new FormData(editExpenseForm);
+      var eAmount = parseFloat(edata.get("amount"));
+      if(!eAmount || eAmount <= 0) return;
+      var eTypedVendor = (edata.get("vendor") || "").toString().trim().slice(0, 60);
+      var eMatchedVendorId = null;
+      if(etr === "wedding" && eTypedVendor){
+        var evmatch = (state.vendors.wedding.items || []).find(function(v){ return v.name.toLowerCase() === eTypedVendor.toLowerCase(); });
+        if(evmatch) eMatchedVendorId = evmatch.id;
+      }
+      updateExpense(eid, {
+        category: edata.get("category"),
+        subcategory: (edata.get("subcategory") || "").toString().trim().slice(0, 30) || null,
+        vendor: eTypedVendor || null,
+        vendorId: eMatchedVendorId,
+        amount: eAmount,
+        date: edata.get("date") || todayStr(),
+        note: (edata.get("note") || "").toString().slice(0, 200),
+        paymentType: edata.get("editExpType") || "cash",
+        cardId: edata.get("editExpCard") || null
+      });
+      return;
+    }
+    var cardForm = ev.target.closest('[data-action="add-card"]');
+    if(cardForm){
+      ev.preventDefault();
+      var cd = new FormData(cardForm);
+      var name = (cd.get("name") || "").toString().trim().slice(0, 40);
+      if(!name) return;
+      var last4 = (cd.get("last4") || "").toString().replace(/[^0-9]/g, "").slice(0, 4);
+      addPaymentMethod(name, last4);
+      cardForm.reset();
+      return;
+    }
+    var catForm = ev.target.closest('[data-action="add-category-inline"]');
+    if(catForm){
+      ev.preventDefault();
+      var tr0 = catForm.dataset.tracker;
+      var nd = new FormData(catForm);
+      var catName = (nd.get("name") || "").toString().trim().slice(0, 40);
+      if(!catName) return;
+      addCategory(tr0, catName);
+      catForm.reset();
+      return;
+    }
+    var subcatForm = ev.target.closest('[data-action="add-subcategory"]');
+    if(subcatForm){
+      ev.preventDefault();
+      var scd = new FormData(subcatForm);
+      var subName = (scd.get("name") || "").toString().trim().slice(0, 30);
+      if(!subName) return;
+      addSubcategory(subcatForm.dataset.tracker, subcatForm.dataset.category, subName);
+      subcatForm.reset();
+      return;
+    }
+    var subForm = ev.target.closest('[data-action="add-subscription"]');
+    if(subForm){
+      ev.preventDefault();
+      var tr = subForm.dataset.tracker;
+      var sd = new FormData(subForm);
+      var sAmount = parseFloat(sd.get("amount"));
+      var sName = (sd.get("name") || "").toString().trim().slice(0, 40);
+      if(!sName || !sAmount || sAmount <= 0) return;
+      addSubscription(tr, {
+        name: sName,
+        amount: sAmount,
+        cycle: sd.get("cycle") === "yearly" ? "yearly" : "monthly",
+        category: sd.get("category") || "Other",
+        vendor: (sd.get("vendor") || "").toString().trim().slice(0, 60) || null,
+        paymentType: sd.get("subType") || "cash",
+        cardId: sd.get("subCard") || null,
+        nextDate: sd.get("nextDate") || todayStr()
+      });
+      subForm.reset();
+      return;
+    }
+    var incomeForm = ev.target.closest('[data-action="add-income"]');
+    if(incomeForm){
+      ev.preventDefault();
+      var itr = incomeForm.dataset.tracker;
+      var idata = new FormData(incomeForm);
+      var iAmount = parseFloat(idata.get("amount"));
+      var iSource = (idata.get("source") || "").toString().trim().slice(0, 60);
+      if(!iSource || !iAmount || iAmount <= 0) return;
+      addIncome(itr, { source: iSource, type: idata.get("incomeType") || "other", amount: iAmount, date: idata.get("date") || todayStr(), note: (idata.get("note") || "").toString().slice(0, 200) });
+      incomeForm.reset();
+      return;
+    }
+    var incomeTypeForm = ev.target.closest('[data-action="add-income-type"]');
+    if(incomeTypeForm){
+      ev.preventDefault();
+      var itd = new FormData(incomeTypeForm);
+      addIncomeType(itd.get("emoji"), itd.get("label"));
+      incomeTypeForm.reset();
+      return;
+    }
+    var recIncForm = ev.target.closest('[data-action="add-recurring-income"]');
+    if(recIncForm){
+      ev.preventDefault();
+      var ritr = recIncForm.dataset.tracker;
+      var rdata = new FormData(recIncForm);
+      var rAmount = parseFloat(rdata.get("amount"));
+      var rSource = (rdata.get("source") || "").toString().trim().slice(0, 60);
+      if(!rSource || !rAmount || rAmount <= 0) return;
+      addRecurringIncome(ritr, {
+        source: rSource,
+        type: rdata.get("incomeType") || "other",
+        amount: rAmount,
+        frequency: rdata.get("frequency") || "monthly",
+        nextDate: rdata.get("nextDate") || todayStr()
+      });
+      recIncForm.reset();
+      return;
+    }
+    var salaryForm = ev.target.closest('[data-action="save-salary"]');
+    if(salaryForm){
+      ev.preventDefault();
+      var sad = new FormData(salaryForm);
+      var annual = parseFloat(sad.get("annualSalary"));
+      saveSalarySetup({
+        annualSalary: isNaN(annual) ? 0 : annual,
+        payFrequency: sad.get("payFrequency") || "biweekly",
+        deductions: state.salarySetup.deductions || []
+      });
+      return;
+    }
+    var dedForm = ev.target.closest('[data-action="add-deduction"]');
+    if(dedForm){
+      ev.preventDefault();
+      var dd = new FormData(dedForm);
+      var dName = (dd.get("name") || "").toString().trim().slice(0, 40);
+      var dValue = parseFloat(dd.get("value"));
+      if(!dName || isNaN(dValue) || dValue < 0) return;
+      var deductions = (state.salarySetup.deductions || []).concat([{ id: uid("ded"), name: dName, kind: dd.get("kind") === "flat" ? "flat" : "percent", value: dValue }]);
+      saveSalarySetup({ annualSalary: state.salarySetup.annualSalary, payFrequency: state.salarySetup.payFrequency, deductions: deductions });
+      dedForm.reset();
+      return;
+    }
+    var dedEditForm = ev.target.closest('[data-action="save-deduction-edit"]');
+    if(dedEditForm){
+      ev.preventDefault();
+      var dedId = dedEditForm.dataset.id;
+      var ded = new FormData(dedEditForm);
+      var edName = (ded.get("name") || "").toString().trim().slice(0, 40);
+      var edValue = parseFloat(ded.get("value"));
+      if(!edName || isNaN(edValue) || edValue < 0) return;
+      var updatedDeductions = (state.salarySetup.deductions || []).map(function(d){
+        if(d.id !== dedId) return d;
+        return { id: d.id, name: edName, kind: ded.get("kind") === "flat" ? "flat" : "percent", value: edValue };
+      });
+      state.editingDeduction = null;
+      saveSalarySetup({ annualSalary: state.salarySetup.annualSalary, payFrequency: state.salarySetup.payFrequency, deductions: updatedDeductions });
+      return;
+    }
+    var vendorForm = ev.target.closest('[data-action="add-vendor"]');
+    if(vendorForm){
+      ev.preventDefault();
+      var vdata = new FormData(vendorForm);
+      var vName = (vdata.get("name") || "").toString().trim().slice(0, 60);
+      var vTotal = parseFloat(vdata.get("total"));
+      if(!vName || !vTotal || vTotal <= 0) return;
+      addVendor({
+        name: vName,
+        category: vdata.get("category") || "Other",
+        total: vTotal,
+        paid: parseFloat(vdata.get("paid")) || 0,
+        dueDate: vdata.get("dueDate") || "",
+        paymentType: vdata.get("vendorType") || "credit",
+        cardId: vdata.get("vendorCard") || null
+      });
+      vendorForm.reset();
+      return;
+    }
+  });
+
+  document.getElementById("receipt-file-input").addEventListener("change", function(ev){
+    var file = ev.target.files && ev.target.files[0];
+    ev.target.value = "";
+    if(!file) return;
+    var tracker = state.scanTracker || state.tracker;
+    runReceiptScan(tracker, file);
+  });
+
+  function commitBudgetEdit(tracker, name){
+    var input = document.querySelector('[data-role="budget-input"][data-tracker="' + tracker + '"]');
+    var newVal = input ? parseFloat(input.value) : NaN;
+    if(isNaN(newVal) || newVal < 0) newVal = 0;
+    var doc = state.budgets[tracker] || { categories: [] };
+    var categories = (doc.categories || []).map(function(c){
+      return c.name === name ? { name: c.name, budget: newVal, subcategories: c.subcategories || [] } : c;
+    });
+    state.editingCategory = null;
+    saveBudget(tracker, categories, doc.hint);
+  }
+
+  function addCategory(tracker, name){
+    var doc = state.budgets[tracker] || { categories: [] };
+    var exists = (doc.categories || []).some(function(c){ return c.name.toLowerCase() === name.toLowerCase(); });
+    if(exists) return;
+    var categories = (doc.categories || []).concat([{ name: name, budget: 0, subcategories: [] }]);
+    saveBudget(tracker, categories, doc.hint);
+  }
+
+  function addSubcategory(tracker, categoryName, subName){
+    subName = (subName || "").toString().trim().slice(0, 30);
+    if(!subName) return;
+    var doc = state.budgets[tracker] || { categories: [] };
+    var categories = (doc.categories || []).map(function(c){
+      if(c.name !== categoryName) return c;
+      var subs = (c.subcategories || []).slice();
+      if(subs.some(function(s){ return s.toLowerCase() === subName.toLowerCase(); })) return c;
+      subs.push(subName);
+      return { name: c.name, budget: c.budget, subcategories: subs };
+    });
+    saveBudget(tracker, categories, doc.hint);
+  }
+
+  function removeSubcategory(tracker, categoryName, subName){
+    var doc = state.budgets[tracker] || { categories: [] };
+    var categories = (doc.categories || []).map(function(c){
+      if(c.name !== categoryName) return c;
+      var subs = (c.subcategories || []).filter(function(s){ return s !== subName; });
+      return { name: c.name, budget: c.budget, subcategories: subs };
+    });
+    saveBudget(tracker, categories, doc.hint);
+  }
+
+  // ---------- receipt scanning (sample capability) ----------
+
+  function setSelectValueOrFallback(select, value, fallback){
+    if(!select) return;
+    var found = Array.prototype.some.call(select.options, function(o){ return o.value === value; });
+    select.value = found ? value : (fallback || select.value);
+  }
+
+  function makeThumbnail(file, maxDim, quality){
+    return new Promise(function(resolve, reject){
+      var img = new Image();
+      var url = URL.createObjectURL(file);
+      img.onload = function(){
+        var scale = Math.min(1, maxDim / Math.max(img.width, img.height));
+        var w = Math.max(1, Math.round(img.width * scale));
+        var h = Math.max(1, Math.round(img.height * scale));
+        var canvas = document.createElement("canvas");
+        canvas.width = w; canvas.height = h;
+        var ctx = canvas.getContext("2d");
+        ctx.drawImage(img, 0, 0, w, h);
+        URL.revokeObjectURL(url);
+        try{ resolve(canvas.toDataURL("image/jpeg", quality)); }
+        catch(e){ reject(e); }
+      };
+      img.onerror = function(e){ URL.revokeObjectURL(url); reject(e); };
+      img.src = url;
+    });
+  }
+
+  var PERMANENT_HIDE_CODES = ["not_granted", "sampling_disabled", "not_declared", "images_unavailable", "capability_disabled", "capability_removed"];
+
+  function runReceiptScan(tracker, file){
+    if(!state.sample) return;
+    var panel = document.getElementById(tracker + "-panel");
+    var btn = panel && panel.querySelector('[data-action="scan-receipt"]');
+    var originalLabel = btn ? btn.textContent : "";
+    if(btn){ btn.disabled = true; btn.textContent = "Reading receipt…"; }
+
+    var categoryNames = ((state.budgets[tracker] && state.budgets[tracker].categories) || []).map(function(c){ return c.name; });
+    var prompt = "This image is a photo of a purchase receipt. Extract the total amount paid, the purchase date, the merchant name, and the best-fitting spending category.\n" +
+      "Choose the category from exactly this list (pick the closest match, or \"Other\" if none fit): " + categoryNames.join(", ") + ".\n" +
+      "Reply with ONLY a JSON object of the shape: {\"merchant\": string, \"amount\": number, \"date\": \"YYYY-MM-DD\" or null, \"category\": string, \"note\": string}. " +
+      "The note should be a short 3-6 word description. If a field is not visible on the receipt, use null.";
+
+    state.sample.json(prompt, { images: file, modelTier: "default" }).then(function(result){
+      var form = panel && panel.querySelector('[data-action="add-expense"]');
+      if(form && result){
+        if(result.category) setSelectValueOrFallback(form.category, String(result.category), "Other");
+        if(typeof result.amount === "number" && result.amount > 0) form.amount.value = result.amount.toFixed(2);
+        if(result.date && /^\d{4}-\d{2}-\d{2}$/.test(result.date)) form.date.value = result.date;
+        var noteVal = [result.merchant, result.note].filter(Boolean).join(" — ");
+        if(noteVal) form.note.value = noteVal.slice(0, 200);
+      }
+      if(btn){ btn.disabled = false; btn.textContent = "✓ Filled from receipt — review before adding"; setTimeout(function(){ if(btn.isConnected) btn.textContent = originalLabel; }, 3000); }
+
+      makeThumbnail(file, 560, 0.6).then(function(dataUrl){
+        if(dataUrl.length < 220000){
+          state.pendingReceipt[tracker] = dataUrl;
+          var box = document.getElementById("receipt-preview-" + tracker);
+          if(box){
+            box.innerHTML = '<img class="receipt-thumb" src="' + dataUrl + '" alt="Receipt preview" data-action="open-receipt-preview">' +
+              '<span class="receipt-preview-note">Attached to this expense</span>' +
+              '<button type="button" class="receipt-clear" data-action="clear-receipt" data-tracker="' + tracker + '">Remove photo</button>';
+          }
+        }
+      }).catch(function(){ /* thumbnail is a nice-to-have; skip silently */ });
+    }).catch(function(err){
+      var code = err && err.code;
+      if(PERMANENT_HIDE_CODES.indexOf(code) !== -1){
+        state.sampleImagesOk = false;
+        render();
+        return;
+      }
+      if(btn){
+        btn.disabled = false;
+        btn.textContent = "Couldn't read that receipt — tap to try again";
+        setTimeout(function(){ if(btn.isConnected) btn.textContent = originalLabel; }, 4000);
+      }
+    });
+  }
+
+  // ---------- persistence layer ----------
+
+  function showBanner(msg, opts){
+    var el = document.getElementById("save-banner");
+    if(!msg){ el.style.display = "none"; el.className = ""; el.innerHTML = ""; return; }
+    opts = opts || {};
+    el.style.display = "flex";
+    el.className = opts.warn ? "warn" : "";
+    var btn = "";
+    if(opts.action){
+      btn = '<button type="button" class="banner-retry" data-action="' + opts.action + '">' + (opts.actionLabel || "↻ Try again") + '</button>';
+    } else if(opts.retry){
+      btn = '<button type="button" class="banner-retry" data-action="reload-page">↻ Try reconnecting</button>';
+    }
+    el.innerHTML = "<span>" + escapeHtml(msg) + "</span>" + btn;
+  }
+
+  function markSynced(){
+    state.lastSyncedAt = new Date();
+    renderSyncStatus();
+  }
+
+  function reportSyncError(label, err){
+    console.error(label + " sync error", err);
+    if(state.syncErrors.indexOf(label) === -1) state.syncErrors.push(label);
+    drive.connected = false;
+    showBanner("Couldn't save to Google Drive just now (your local view is still fine, but changes aren't backed up). This usually means your Drive session expired — reconnect to keep saving.", { warn: true, action: "connect-drive", actionLabel: "🔗 Reconnect Google Drive" });
+    renderSyncStatus();
+  }
+
+  function lastEntryTimestamp(){
+    var latest = null;
+    state.expenses.forEach(function(e){
+      var t = e.createdAt || e.updatedAt || null;
+      if(t && (!latest || t > latest)) latest = t;
+    });
+    return latest;
+  }
+
+  function renderSyncStatus(){
+    var el = document.getElementById("sync-status");
+    if(!el) return;
+    if(!state.lastSyncedAt){ el.textContent = ""; return; }
+    var parts = ["Last refreshed " + state.lastSyncedAt.toLocaleTimeString()];
+    var lastEntry = lastEntryTimestamp();
+    if(lastEntry){
+      var d = new Date(lastEntry);
+      if(!isNaN(d.getTime())) parts.push("last entry logged " + d.toLocaleString());
+    }
+    if(state.syncErrors.length) parts.push("⚠ sync issue: " + state.syncErrors.join(", "));
+    el.textContent = parts.join(" · ");
+  }
+
+  var localIdCounter = 1;
+
+  function saveBudget(tracker, categories, hint){
+    var payload = { categories: categories, hint: hint || (DEFAULT_BUDGETS[tracker] && DEFAULT_BUDGETS[tracker].hint) || "", updatedAt: new Date().toISOString() };
+    state.budgets[tracker] = payload;
+    render();
+    schedulePersist();
+  }
+
+  function addExpense(expense){
+    normalizeExpense(expense);
+    if(expense.tracker === "wedding" && expense.vendorId){
+      applyVendorPaymentAmount(expense.vendorId, Number(expense.amount) || 0);
+    }
+    state.expenses.unshift(Object.assign({ id: uid("exp") }, expense));
+    schedulePersist();
+  }
+
+  function applyVendorPaymentAmount(vendorId, amount){
+    var v = vendorById(vendorId);
+    if(!v || !amount) return;
+    v.paid = (Number(v.paid) || 0) + amount;
+    schedulePersist();
+  }
+
+  function deleteExpense(id){
+    state.expenses = state.expenses.filter(function(e){ return e.id !== id; });
+    render();
+    schedulePersist();
+  }
+
+  function updateExpense(id, changes){
+    var idx = state.expenses.findIndex(function(e){ return e.id === id; });
+    if(idx === -1) return;
+    var old = state.expenses[idx];
+    var updated = Object.assign({}, old, changes);
+    normalizeExpense(updated);
+
+    if(old.tracker === "wedding" && old.vendorId && old.vendorId !== updated.vendorId){
+      applyVendorPaymentAmount(old.vendorId, -(Number(old.amount) || 0));
+    }
+    if(updated.tracker === "wedding" && updated.vendorId){
+      if(old.vendorId === updated.vendorId){
+        var delta = (Number(updated.amount) || 0) - (Number(old.amount) || 0);
+        if(delta) applyVendorPaymentAmount(updated.vendorId, delta);
+      } else {
+        applyVendorPaymentAmount(updated.vendorId, Number(updated.amount) || 0);
+      }
+    }
+
+    state.expenses[idx] = updated;
+    state.editingExpense = null;
+    render();
+    schedulePersist();
+  }
+
+  function savePaymentMethods(){
+    render();
+    schedulePersist();
+  }
+
+  function addPaymentMethod(name, last4){
+    state.paymentMethods.items = (state.paymentMethods.items || []).concat([{ id: uid("card"), name: name, last4: last4 || "" }]);
+    savePaymentMethods();
+  }
+
+  function removePaymentMethod(id){
+    state.paymentMethods.items = (state.paymentMethods.items || []).filter(function(p){ return p.id !== id; });
+    savePaymentMethods();
+  }
+
+  function saveSubscriptions(tracker){
+    render();
+    schedulePersist();
+  }
+
+  function addSubscription(tracker, sub){
+    sub.id = uid("sub");
+    state.subscriptions[tracker].items = (state.subscriptions[tracker].items || []).concat([sub]);
+    saveSubscriptions(tracker);
+  }
+
+  function removeSubscription(tracker, id){
+    state.subscriptions[tracker].items = (state.subscriptions[tracker].items || []).filter(function(s){ return s.id !== id; });
+    saveSubscriptions(tracker);
+  }
+
+  function logSubscriptionPayment(tracker, id){
+    var items = state.subscriptions[tracker].items || [];
+    var sub = items.find(function(s){ return s.id === id; });
+    if(!sub) return;
+    addExpense({
+      tracker: tracker,
+      category: sub.category || "Other",
+      vendor: sub.vendor || null,
+      amount: Number(sub.amount) || 0,
+      date: todayStr(),
+      note: "Subscription: " + sub.name,
+      paymentType: sub.paymentType || "cash",
+      cardId: sub.cardId || null,
+      createdAt: new Date().toISOString()
+    });
+    sub.nextDate = addToDate(sub.nextDate, sub.cycle);
+    saveSubscriptions(tracker);
+  }
+
+  function saveIncome(tracker){
+    render();
+    schedulePersist();
+  }
+
+  function addIncome(tracker, item){
+    item.id = uid("inc");
+    state.income[tracker].items = (state.income[tracker].items || []).concat([item]);
+    saveIncome(tracker);
+  }
+
+  function removeIncome(tracker, id){
+    state.income[tracker].items = (state.income[tracker].items || []).filter(function(i){ return i.id !== id; });
+    saveIncome(tracker);
+  }
+
+  function saveIncomeTypes(){
+    render();
+    schedulePersist();
+  }
+
+  function addIncomeType(emoji, label){
+    label = (label || "").toString().trim().slice(0, 24);
+    if(!label) return;
+    var list = incomeTypesList().slice();
+    if(list.some(function(t){ return t.label.toLowerCase() === label.toLowerCase(); })) return;
+    list.push({ id: uid("itype"), label: label, emoji: (emoji || "").toString().trim().slice(0, 4) || "💰" });
+    state.incomeTypes = list;
+    saveIncomeTypes();
+  }
+
+  function removeIncomeType(id){
+    var list = incomeTypesList().filter(function(t){ return t.id !== id; });
+    if(list.length === 0) return;
+    state.incomeTypes = list;
+    saveIncomeTypes();
+  }
+
+  function saveRecurringIncome(tracker){
+    render();
+    schedulePersist();
+  }
+
+  function addRecurringIncome(tracker, item){
+    item.id = uid("rinc");
+    state.recurringIncome[tracker].items = (state.recurringIncome[tracker].items || []).concat([item]);
+    saveRecurringIncome(tracker);
+  }
+
+  function removeRecurringIncome(tracker, id){
+    state.recurringIncome[tracker].items = (state.recurringIncome[tracker].items || []).filter(function(r){ return r.id !== id; });
+    saveRecurringIncome(tracker);
+  }
+
+  function logRecurringIncomePayment(tracker, id){
+    var items = state.recurringIncome[tracker].items || [];
+    var r = items.find(function(x){ return x.id === id; });
+    if(!r) return;
+    addIncome(tracker, { source: r.source, type: r.type || "other", amount: Number(r.amount) || 0, date: todayStr(), note: "" });
+    r.nextDate = addToDate(r.nextDate, r.frequency);
+    saveRecurringIncome(tracker);
+  }
+
+  function saveSalarySetup(setup){
+    state.salarySetup = setup;
+    render();
+    schedulePersist();
+  }
+
+  function payFrequencyMeta(id){
+    return PAY_FREQUENCIES.find(function(p){ return p.id === id; }) || PAY_FREQUENCIES[1];
+  }
+
+  function computePaycheck(){
+    var s = state.salarySetup;
+    var freq = payFrequencyMeta(s.payFrequency);
+    var gross = (Number(s.annualSalary) || 0) / freq.periods;
+    var deductions = (s.deductions || []).map(function(d){
+      var amt = d.kind === "percent" ? gross * (Number(d.value) || 0) / 100 : (Number(d.value) || 0);
+      return { id: d.id, name: d.name, kind: d.kind, value: d.value, amount: amt };
+    });
+    var totalDeductions = deductions.reduce(function(sum, d){ return sum + d.amount; }, 0);
+    var net = gross - totalDeductions;
+    return { freq: freq, gross: gross, deductions: deductions, totalDeductions: totalDeductions, net: net };
+  }
+
+  function saveVendors(){
+    render();
+    schedulePersist();
+  }
+
+  function addVendor(v){
+    v.id = uid("vendor");
+    state.vendors.wedding.items = (state.vendors.wedding.items || []).concat([v]);
+    saveVendors();
+  }
+
+  function removeVendor(id){
+    state.vendors.wedding.items = (state.vendors.wedding.items || []).filter(function(v){ return v.id !== id; });
+    saveVendors();
+  }
+
+  function logVendorPayment(id, amount){
+    var v = vendorById(id);
+    if(!v) return;
+    addExpense({
+      tracker: "wedding",
+      category: v.category || "Other",
+      vendor: v.name,
+      vendorId: v.id,
+      amount: amount,
+      date: todayStr(),
+      note: "Vendor payment: " + v.name,
+      paymentType: v.paymentType || "credit",
+      cardId: v.cardId || null,
+      createdAt: new Date().toISOString()
+    });
+    render();
+  }
+
+  function exportCsv(){
+    var csv = buildExpensesCsv();
+    if(state.downloads){
+      state.downloads.save({ filename: "budget-ledger-export.csv", data: csv }).then(function(){
+        state.exportText = null;
+        render();
+      }).catch(function(){
+        state.exportText = csv;
+        render();
+      });
+    } else {
+      state.exportText = csv;
+      render();
+    }
+  }
+
+  function buildFullBackupObject(){
+    return {
+      version: 1,
+      exportedAt: new Date().toISOString(),
+      budgets: state.budgets,
+      expenses: state.expenses,
+      paymentMethods: state.paymentMethods,
+      subscriptions: state.subscriptions,
+      income: state.income,
+      incomeTypes: state.incomeTypes,
+      recurringIncome: state.recurringIncome,
+      salarySetup: state.salarySetup,
+      vendors: state.vendors
+    };
+  }
+
+  function exportBackup(){
+    var json = JSON.stringify(buildFullBackupObject(), null, 2);
+    if(state.downloads){
+      state.downloads.save({ filename: "budget-ledger-backup-" + todayStr() + ".json", data: json }).then(function(){
+        state.backupExportText = null;
+        render();
+      }).catch(function(){
+        state.backupExportText = json;
+        render();
+      });
+    } else {
+      state.backupExportText = json;
+      render();
+    }
+  }
+
+  function handleBackupJsonImport(file){
+    var reader = new FileReader();
+    reader.onload = function(){
+      var data;
+      try{ data = JSON.parse(String(reader.result || "")); }
+      catch(e){
+        state.backupImportPreview = null;
+        state.backupImportError = "That file isn't valid JSON — pick a backup exported from this ledger.";
+        render();
+        return;
+      }
+      if(!data || typeof data !== "object" || (!data.expenses && !data.budgets)){
+        state.backupImportPreview = null;
+        state.backupImportError = "That doesn't look like a Budget Ledger backup file.";
+        render();
+        return;
+      }
+      var counts = {
+        expenses: Array.isArray(data.expenses) ? data.expenses.length : 0,
+        personalCategories: (data.budgets && data.budgets.personal && data.budgets.personal.categories) ? data.budgets.personal.categories.length : 0,
+        weddingCategories: (data.budgets && data.budgets.wedding && data.budgets.wedding.categories) ? data.budgets.wedding.categories.length : 0,
+        subscriptions: (((data.subscriptions && data.subscriptions.personal && data.subscriptions.personal.items) || []).length) + (((data.subscriptions && data.subscriptions.wedding && data.subscriptions.wedding.items) || []).length),
+        vendors: (data.vendors && data.vendors.wedding && data.vendors.wedding.items) ? data.vendors.wedding.items.length : 0
+      };
+      state.backupImportError = null;
+      state.backupImportPreview = { data: data, counts: counts, exportedAt: data.exportedAt || null };
+      render();
+    };
+    reader.readAsText(file);
+  }
+
+  function applyBackupImport(data){
+    var trackers = ["personal", "wedding"];
+    if(data.budgets){
+      trackers.forEach(function(t){ if(data.budgets[t]) state.budgets[t] = data.budgets[t]; });
+    }
+    if(data.paymentMethods){
+      state.paymentMethods = data.paymentMethods;
+    }
+    if(data.subscriptions){
+      trackers.forEach(function(t){ if(data.subscriptions[t]) state.subscriptions[t] = data.subscriptions[t]; });
+    }
+    if(data.income){
+      trackers.forEach(function(t){ if(data.income[t]) state.income[t] = data.income[t]; });
+    }
+    if(data.incomeTypes){
+      state.incomeTypes = data.incomeTypes;
+    }
+    if(data.recurringIncome){
+      trackers.forEach(function(t){ if(data.recurringIncome[t]) state.recurringIncome[t] = data.recurringIncome[t]; });
+    }
+    if(data.salarySetup){
+      state.salarySetup = data.salarySetup;
+    }
+    if(data.vendors && data.vendors.wedding){
+      state.vendors.wedding = data.vendors.wedding;
+    }
+
+    var existingIds = {};
+    state.expenses.forEach(function(e){ existingIds[e.id] = true; });
+    var added = 0;
+    (data.expenses || []).forEach(function(e){
+      if(!e || !e.id || existingIds[e.id]) return;
+      var payload = Object.assign({}, e);
+      delete payload.id;
+      normalizeExpense(payload);
+      state.expenses.push(Object.assign({ id: e.id }, payload));
+      existingIds[e.id] = true;
+      added++;
+    });
+    state.expenses.sort(function(a, b){ return (b.date || "").localeCompare(a.date || ""); });
+    schedulePersist();
+    return added;
+  }
+
+  function confirmBackupImport(){
+    if(!state.backupImportPreview) return;
+    applyBackupImport(state.backupImportPreview.data);
+    state.backupImportPreview = null;
+    render();
+  }
+
+  function handleCsvImport(file){
+    var tracker = state.tracker;
+    var defaultType = "bank_transfer";
+    var reader = new FileReader();
+    reader.onload = function(){
+      var rows = parseCsv(String(reader.result || ""));
+      if(rows.length < 2) return;
+      var header = rows[0].map(function(h){ return h.trim().toLowerCase(); });
+      var dateIdx = header.findIndex(function(h){ return /date/.test(h); });
+      var descIdx = header.findIndex(function(h){ return /(description|memo|payee|merchant|name)/.test(h); });
+      var amountIdx = header.findIndex(function(h){ return /^amount$/.test(h) || /debit/.test(h); });
+      if(amountIdx === -1) amountIdx = header.findIndex(function(h){ return /amount/.test(h); });
+      if(dateIdx === -1 || amountIdx === -1) return;
+
+      var parsed = [];
+      rows.slice(1).forEach(function(r){
+        var rawDate = (r[dateIdx] || "").trim();
+        var rawAmount = (r[amountIdx] || "").replace(/[^0-9.\-]/g, "");
+        var amount = Math.abs(parseFloat(rawAmount));
+        if(!rawDate || !amount) return;
+        var d = new Date(rawDate);
+        if(isNaN(d.getTime())) return;
+        var iso = d.getFullYear() + "-" + String(d.getMonth() + 1).padStart(2, "0") + "-" + String(d.getDate()).padStart(2, "0");
+        parsed.push({ date: iso, note: descIdx >= 0 ? (r[descIdx] || "").trim().slice(0, 100) : "Imported transaction", amount: amount, category: "Other", include: true });
+      });
+      parsed = parsed.slice(0, 200);
+      if(parsed.length === 0) return;
+
+      var categoryNames = ((state.budgets[tracker] && state.budgets[tracker].categories) || []).map(function(c){ return c.name; });
+      if(state.sample && categoryNames.length){
+        var prompt = "Assign the best category to each bank transaction description below, from exactly this list: " + categoryNames.join(", ") + " (use \"Other\" if none fit).\n" +
+          "Reply with ONLY a JSON array of category strings, one per line below, in the same order, same length.\n\n" +
+          parsed.map(function(p, i){ return (i + 1) + ". " + p.note + " ($" + p.amount.toFixed(2) + ")"; }).join("\n");
+        state.sample.json(prompt).then(function(cats){
+          if(Array.isArray(cats)){
+            parsed.forEach(function(p, i){ if(cats[i] && categoryNames.indexOf(String(cats[i])) !== -1) p.category = String(cats[i]); });
+          }
+          state.importPreview = { tracker: tracker, type: defaultType, rows: parsed };
+          render();
+        }).catch(function(){
+          state.importPreview = { tracker: tracker, type: defaultType, rows: parsed };
+          render();
+        });
+      } else {
+        state.importPreview = { tracker: tracker, type: defaultType, rows: parsed };
+        render();
+      }
+    };
+    reader.readAsText(file);
+  }
+
+  function confirmImport(){
+    if(!state.importPreview) return;
+    var p = state.importPreview;
+    p.rows.filter(function(r){ return r.include; }).forEach(function(r){
+      addExpense({
+        tracker: p.tracker,
+        category: r.category || "Other",
+        amount: r.amount,
+        date: r.date,
+        note: r.note,
+        paymentType: p.type || "bank_transfer",
+        cardId: null,
+        createdAt: new Date().toISOString()
+      });
+    });
+    state.importPreview = null;
+    render();
+  }
+
+  // ---------- Google Drive auth + sync ----------
+
+  function driveConfigured(){
+    return GOOGLE_CLIENT_ID.indexOf("PASTE_YOUR_GOOGLE_CLIENT_ID_HERE") === -1;
+  }
+
+  function connectDrive(){
+    if(!driveConfigured()){
+      showBanner("This copy hasn't been set up with a Google Client ID yet. See the \"GOOGLE DRIVE SETUP\" comment near the top of the file for the one-time steps, paste your Client ID in, then reload.", { warn: true });
+      return;
+    }
+    if(typeof google === "undefined" || !google.accounts || !google.accounts.oauth2){
+      showBanner("Still loading Google's sign-in library — try again in a second.", { warn: true, action: "connect-drive", actionLabel: "↻ Try again" });
+      return;
+    }
+    showBanner("Connecting to Google Drive…");
+    if(!drive.tokenClient){
+      drive.tokenClient = google.accounts.oauth2.initTokenClient({
+        client_id: GOOGLE_CLIENT_ID,
+        scope: "https://www.googleapis.com/auth/drive.file",
+        callback: function(resp){
+          if(!resp || resp.error){
+            showBanner("Google Drive sign-in didn't go through.", { warn: true, action: "connect-drive", actionLabel: "↻ Try again" });
+            return;
+          }
+          drive.accessToken = resp.access_token;
+          loadFromDrive();
+        }
+      });
+    }
+    drive.tokenClient.requestAccessToken({ prompt: drive.accessToken ? "" : "consent" });
+  }
+
+  function driveApiFetch(url, opts){
+    opts = opts || {};
+    opts.headers = Object.assign({ Authorization: "Bearer " + drive.accessToken }, opts.headers || {});
+    return fetch(url, opts).then(function(res){
+      if(!res.ok){
+        return res.text().then(function(t){
+          var err = new Error("Drive API " + res.status + ": " + t);
+          err.status = res.status;
+          throw err;
+        });
+      }
+      return res;
+    });
+  }
+
+  function driveFindFile(){
+    var q = encodeURIComponent("name = '" + DRIVE_FILE_NAME + "' and trashed = false");
+    var url = "https://www.googleapis.com/drive/v3/files?q=" + q + "&spaces=drive&fields=files(id,name)";
+    return driveApiFetch(url).then(function(res){ return res.json(); }).then(function(json){
+      return (json.files && json.files[0]) ? json.files[0].id : null;
+    });
+  }
+
+  function driveGetFileContent(fileId){
+    var url = "https://www.googleapis.com/drive/v3/files/" + fileId + "?alt=media";
+    return driveApiFetch(url).then(function(res){ return res.json(); });
+  }
+
+  function driveMultipartCreate(name, dataObj){
+    var boundary = "budgetledger-" + Date.now();
+    var metadata = { name: name, mimeType: "application/json" };
+    var body =
+      "--" + boundary + "\r\n" +
+      "Content-Type: application/json; charset=UTF-8\r\n\r\n" +
+      JSON.stringify(metadata) + "\r\n" +
+      "--" + boundary + "\r\n" +
+      "Content-Type: application/json\r\n\r\n" +
+      JSON.stringify(dataObj) + "\r\n" +
+      "--" + boundary + "--";
+    var url = "https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart&fields=id";
+    return driveApiFetch(url, {
+      method: "POST",
+      headers: { "Content-Type": "multipart/related; boundary=" + boundary },
+      body: body
+    }).then(function(res){ return res.json(); }).then(function(json){ return json.id; });
+  }
+
+  function driveUpdateFileContent(fileId, dataObj){
+    var url = "https://www.googleapis.com/upload/drive/v3/files/" + fileId + "?uploadType=media";
+    return driveApiFetch(url, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(dataObj)
+    });
+  }
+
+  function applyLoadedData(data){
+    data = data || {};
+    var trackers = ["personal", "wedding"];
+
+    state.budgets = data.budgets || {};
+    trackers.forEach(function(t){
+      if(!state.budgets[t] || !state.budgets[t].categories) state.budgets[t] = DEFAULT_BUDGETS[t];
+    });
+
+    state.expenses = Array.isArray(data.expenses) ? data.expenses.map(normalizeExpense) : [];
+    state.expenses.sort(function(a, b){ return (b.date || "").localeCompare(a.date || ""); });
+
+    state.paymentMethods = data.paymentMethods || { items: [] };
+    if(!state.paymentMethods.items) state.paymentMethods.items = [];
+
+    state.subscriptions = data.subscriptions || { personal: { items: [] }, wedding: { items: [] } };
+    trackers.forEach(function(t){
+      if(!state.subscriptions[t]) state.subscriptions[t] = { items: [] };
+      if(!state.subscriptions[t].items) state.subscriptions[t].items = [];
+      state.subscriptions[t].items.forEach(normalizeExpense);
+    });
+
+    state.income = data.income || { personal: { items: [] }, wedding: { items: [] } };
+    trackers.forEach(function(t){
+      if(!state.income[t]) state.income[t] = { items: [] };
+      if(!state.income[t].items) state.income[t].items = [];
+    });
+
+    state.incomeTypes = (data.incomeTypes && data.incomeTypes.length) ? data.incomeTypes : null;
+
+    state.recurringIncome = data.recurringIncome || { personal: { items: [] }, wedding: { items: [] } };
+    trackers.forEach(function(t){
+      if(!state.recurringIncome[t]) state.recurringIncome[t] = { items: [] };
+      if(!state.recurringIncome[t].items) state.recurringIncome[t].items = [];
+    });
+
+    state.salarySetup = data.salarySetup || { annualSalary: 0, payFrequency: "biweekly", deductions: [] };
+
+    state.vendors = data.vendors || { wedding: { items: [] } };
+    if(!state.vendors.wedding) state.vendors.wedding = { items: [] };
+    if(!state.vendors.wedding.items) state.vendors.wedding.items = [];
+    state.vendors.wedding.items.forEach(normalizeExpense);
+  }
+
+  function loadFromDrive(){
+    showBanner("Loading your data from Google Drive…");
+    driveFindFile().then(function(fileId){
+      if(fileId){
+        drive.fileId = fileId;
+        return driveGetFileContent(fileId).then(function(data){ applyLoadedData(data); });
+      }
+      // first time connecting — seed starter budgets and create the file in Drive
+      applyLoadedData({ budgets: { personal: DEFAULT_BUDGETS.personal, wedding: DEFAULT_BUDGETS.wedding } });
+      return driveMultipartCreate(DRIVE_FILE_NAME, buildFullBackupObject()).then(function(id){ drive.fileId = id; });
+    }).then(function(){
+      drive.connected = true;
+      state.syncErrors = [];
+      showBanner(null);
+      render();
+      markSynced();
+    }).catch(function(err){
+      console.error("Drive load failed", err);
+      state.budgets.personal = state.budgets.personal || DEFAULT_BUDGETS.personal;
+      state.budgets.wedding = state.budgets.wedding || DEFAULT_BUDGETS.wedding;
+      drive.connected = false;
+      showBanner("Couldn't load your data from Google Drive. What's shown below are starter placeholders, not your saved data (which is untouched). Reconnect to try again.", { warn: true, action: "connect-drive", actionLabel: "🔗 Reconnect Google Drive" });
+      render();
+    });
+  }
+
+  function persistToDriveNow(){
+    if(!drive.connected || !drive.accessToken) return;
+    var payload = buildFullBackupObject();
+    var work = drive.fileId
+      ? driveUpdateFileContent(drive.fileId, payload)
+      : driveMultipartCreate(DRIVE_FILE_NAME, payload).then(function(id){ drive.fileId = id; });
+    work.then(function(){
+      state.syncErrors = [];
+      markSynced();
+    }).catch(function(err){ reportSyncError("Google Drive", err); });
+  }
+
+  function schedulePersist(){
+    if(persistTimer) clearTimeout(persistTimer);
+    persistTimer = setTimeout(function(){
+      persistTimer = null;
+      persistToDriveNow();
+    }, 800);
+  }
+
+  function initSample(){
+    if(typeof window.claude === "undefined" || typeof window.claude.use !== "function") return;
+    window.claude.use("sample").then(function(sample){
+      if(!sample) return;
+      return sample.limits().catch(function(){ return null; }).then(function(limits){
+        if(!limits || !limits.images) return;
+        state.sample = sample;
+        state.sampleImagesOk = true;
+        render();
+      });
+    }).catch(function(){ /* no sample support in this view */ });
+  }
+
+  function initDownloads(){
+    if(typeof window.claude === "undefined" || typeof window.claude.use !== "function") return;
+    window.claude.use("downloads").then(function(d){ if(d) state.downloads = d; }).catch(function(){});
+  }
+
+  function init(){
+    state.budgets.personal = DEFAULT_BUDGETS.personal;
+    state.budgets.wedding = DEFAULT_BUDGETS.wedding;
+    render();
+    initSample();
+    initDownloads();
+
+    if(!driveConfigured()){
+      showBanner("This copy hasn't been set up with a Google Client ID yet, so what's shown below are starter placeholders that won't be saved. See the \"GOOGLE DRIVE SETUP\" comment near the top of the file for the one-time steps.", { warn: true });
+      return;
+    }
+
+    showBanner("Connect Google Drive to load and save your data.", { action: "connect-drive", actionLabel: "🔗 Connect Google Drive" });
+  }
+
+  init();
+})();
+</script>
+</body>
+</html>
