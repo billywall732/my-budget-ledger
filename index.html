@@ -41,6 +41,8 @@
     --series-8: #e34948;
 
     --shadow: 0 1px 2px rgba(34,29,21,0.06), 0 8px 24px -12px rgba(34,29,21,0.18);
+    --font-heading: "Fraunces", Georgia, serif;
+    --font-body: "Work Sans", system-ui, -apple-system, sans-serif;
   }
   @media (prefers-color-scheme: dark){
     :root:not([data-theme="light"]){
@@ -114,12 +116,49 @@
 
     --shadow: 0 1px 2px rgba(0,0,0,0.3), 0 8px 24px -12px rgba(0,0,0,0.5);
   }
+  :root[data-theme="editorial"]{
+    color-scheme: light;
+    --bg: #ece5d3;
+    --surface: #f7f2e4;
+    --surface-2: #efe8d6;
+    --text-primary: #1c1913;
+    --text-secondary: #4a4436;
+    --text-muted: #7d7660;
+    --border: rgba(28,25,19,0.22);
+    --border-strong: rgba(28,25,19,0.4);
+
+    --accent-personal: #2f4a3a;
+    --accent-personal-soft: rgba(47,74,58,0.14);
+    --accent-wedding: #7a2e22;
+    --accent-wedding-soft: rgba(122,46,34,0.14);
+
+    --status-good: #2f6f3a;
+    --status-warning-bg: #c98a1f;
+    --status-warning-text: #3a2a08;
+    --status-critical: #8a2c22;
+
+    --chart-expense: #8a4a3a;
+    --chart-income: #2f4a3a;
+
+    --series-1: #2a4a78;
+    --series-2: #8a4a1f;
+    --series-3: #2f6f52;
+    --series-4: #8a6a0a;
+    --series-5: #7a2e4a;
+    --series-6: #3a5a1f;
+    --series-7: #4a3a7a;
+    --series-8: #7a2e2e;
+
+    --shadow: 0 1px 0 rgba(28,25,19,0.15);
+    --font-heading: "Fraunces", Georgia, serif;
+    --font-body: "Fraunces", Georgia, serif;
+  }
 
   *{ box-sizing: border-box; }
   body{
     background: var(--bg);
     color: var(--text-primary);
-    font-family: "Work Sans", system-ui, -apple-system, sans-serif;
+    font-family: var(--font-body);
     font-size: 15px;
     line-height: 1.5;
   }
@@ -141,9 +180,56 @@
     flex-direction: column;
     gap: 4px;
     flex: 1;
+    min-width: 0;
+  }
+  .header-actions{
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex-wrap: wrap;
+    justify-content: flex-end;
+    flex: none;
+  }
+  .icon-btn{
+    appearance: none;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 20px;
+    width: 36px;
+    height: 36px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    font-size: 16px;
+    line-height: 1;
+    color: var(--text-primary);
+    flex: none;
+  }
+  .icon-btn:hover{ border-color: var(--border-strong); }
+  .toast{
+    position: fixed;
+    left: 50%;
+    bottom: 24px;
+    transform: translateX(-50%) translateY(8px);
+    background: var(--text-primary);
+    color: var(--bg);
+    font-size: 13.5px;
+    font-weight: 500;
+    padding: 10px 18px;
+    border-radius: 20px;
+    box-shadow: var(--shadow);
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.2s ease, transform 0.2s ease;
+    z-index: 2000;
+  }
+  .toast.show{
+    opacity: 1;
+    transform: translateX(-50%) translateY(0);
   }
   h1{
-    font-family: "Fraunces", Georgia, serif;
+    font-family: var(--font-heading);
     font-weight: 600;
     font-size: 34px;
     letter-spacing: -0.01em;
@@ -976,11 +1062,33 @@
   table.tx-table tr:last-child td{ border-bottom: none; }
   td.tx-date, td.tx-amount{ font-family: "IBM Plex Mono", monospace; font-variant-numeric: tabular-nums; white-space: nowrap; }
   td.tx-amount{ text-align: right; font-weight: 500; }
-  td.tx-cat{ display: flex; align-items: center; gap: 8px; white-space: nowrap; }
+  td.tx-cat{ display: flex; align-items: center; gap: 8px; white-space: nowrap; overflow: hidden; }
   td.tx-cat .swatch{ width: 8px; height: 8px; border-radius: 50%; flex: none; }
   td.tx-note{ color: var(--text-secondary); }
   td.tx-pm{ white-space: nowrap; color: var(--text-secondary); font-size: 12.5px; }
   td.tx-receipt{ white-space: nowrap; }
+
+  /* Full transaction log: fixed column widths so rows line up and the
+     Note column gets real room instead of being squeezed to near-zero
+     and wrapping every row onto multiple lines. */
+  table.tx-table.tx-table-log{ table-layout: fixed; min-width: 1240px; }
+  .tx-table-log th, .tx-table-log td{ overflow: hidden; }
+  .tx-table-log th.th-date, .tx-table-log td.tx-date{ width: 132px; }
+  .tx-table-log th.th-cat, .tx-table-log td.tx-cat{ width: 170px; }
+  .tx-table-log th.th-pm, .tx-table-log td.tx-pm{ width: 126px; }
+  .tx-table-log th.th-amount, .tx-table-log td.tx-amount{ width: 116px; }
+  .tx-table-log th.th-receipt, .tx-table-log td.tx-receipt{ width: 88px; }
+  .tx-table-log th.th-actions, .tx-table-log td.tx-actions{ width: 126px; }
+  .tx-table-log td.tx-note .tx-note-text{
+    display: -webkit-box;
+    -webkit-box-orient: vertical;
+    -webkit-line-clamp: 2;
+    line-clamp: 2;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: normal;
+    word-break: break-word;
+  }
   .row-delete{
     appearance: none;
     background: none;
@@ -1091,6 +1199,13 @@
   [hidden]{ display: none !important; }
 
   @media (max-width: 560px){
+    header.top{
+      flex-direction: column;
+      align-items: stretch;
+    }
+    .header-actions{
+      justify-content: flex-start;
+    }
     .cat-row{
       grid-template-columns: 1fr auto;
       grid-template-areas: "name edit" "bar bar" "amounts amounts";
@@ -1116,8 +1231,12 @@
       <p class="subtitle">Personal spending and wedding costs, tracked side by side.</p>
       <p class="subtitle" id="last-change-subtitle" style="margin-top:2px"></p>
     </div>
-    <div class="auth-section guest" id="auth-section">
-      <button type="button" class="sign-in-btn" id="sign-in-btn" data-action="sign-in">Sign In with Google</button>
+    <div class="header-actions">
+      <button type="button" class="icon-btn" id="theme-toggle-btn" data-action="cycle-theme" title="Switch theme" aria-label="Switch theme">☀️</button>
+      <button type="button" class="icon-btn" id="share-btn" data-action="share-app" title="Share this app" aria-label="Share this app">🔗</button>
+      <div class="auth-section guest" id="auth-section">
+        <button type="button" class="sign-in-btn" id="sign-in-btn" data-action="sign-in">Sign In with Google</button>
+      </div>
     </div>
   </header>
 
@@ -1138,6 +1257,7 @@
 <input type="file" id="receipt-file-input" accept="image/*" capture="environment" hidden>
 <div id="lightbox" class="lightbox" hidden><img id="lightbox-img" alt="Receipt"></div>
 <div id="edit-expense-modal"></div>
+<div id="toast" class="toast"></div>
 
 <script>
 (function(){
@@ -1260,8 +1380,6 @@
     expandedCategory: null,
     logFilter: { personal: { q: "", category: "", type: "" }, wedding: { q: "", category: "", type: "" } },
     importPreview: null,
-    exportText: null,
-    backupExportText: null,
     backupImportPreview: null,
     backupImportError: null,
     histCaption: { personal: null, wedding: null },
@@ -2111,7 +2229,7 @@
     if(txs.length === 0){
       html += '<div class="empty-note">No expenses logged in this category' + (monthKey ? ' for ' + monthLabel(monthKey) : '') + '.</div>';
     } else {
-      html += '<table class="tx-table"><thead><tr><th>Date</th><th>Subcategory</th>' + (showVendor ? '<th>Vendor</th>' : '') + '<th>Payment</th><th>Note</th><th style="text-align:right">Amount</th><th>Receipt</th><th></th></tr></thead><tbody>';
+      html += '<table class="tx-table tx-table-log"><thead><tr><th class="th-date">Date</th><th class="th-pm">Subcategory</th>' + (showVendor ? '<th class="th-pm">Vendor</th>' : '') + '<th class="th-pm">Payment</th><th class="th-note">Note</th><th class="th-amount" style="text-align:right">Amount</th><th class="th-receipt">Receipt</th><th class="th-actions"></th></tr></thead><tbody>';
       txs.forEach(function(e){
         html += '<tr>';
         html += '<td class="tx-date">' + fmtDate(e.date) + '</td>';
@@ -2120,7 +2238,7 @@
           html += '<td class="tx-pm">' + (vendorLabel(e) ? escapeHtml(vendorLabel(e)) : '—') + '</td>';
         }
         html += '<td class="tx-pm">' + escapeHtml(paymentLabel(e)) + '</td>';
-        html += '<td class="tx-note">' + escapeHtml(e.note || "") + '</td>';
+        html += '<td class="tx-note" title="' + escapeHtml(e.note || "") + '"><span class="tx-note-text">' + escapeHtml(e.note || "") + '</span></td>';
         html += '<td class="tx-amount">' + currencyPrecise.format(Number(e.amount) || 0) + '</td>';
         html += '<td class="tx-receipt">' + (e.receipt ? ('<img class="receipt-thumb" src="' + e.receipt + '" alt="Receipt" data-action="open-receipt" data-id="' + e.id + '">') : '—') + '</td>';
         html += '<td class="tx-actions"><button class="row-edit" data-action="edit-expense" data-id="' + e.id + '" title="Edit">Edit</button><button class="row-delete" data-action="delete-expense" data-id="' + e.id + '" title="Delete">Remove</button></td>';
@@ -2198,7 +2316,7 @@
       return '<div class="empty-note">No matching expenses' + (state.expenses.some(function(e){ return e.tracker === tracker; }) ? ' — try clearing a filter.' : ' yet for this budget.') + '</div>';
     }
     var showVendor = hasVendorTags(tracker);
-    var html = '<table class="tx-table"><thead><tr><th>Date</th><th>Category</th>' + (showVendor ? '<th>Vendor</th>' : '') + '<th>Payment</th><th>Note</th><th style="text-align:right">Amount</th><th>Receipt</th><th></th></tr></thead><tbody>';
+    var html = '<table class="tx-table tx-table-log"><thead><tr><th class="th-date">Date</th><th class="th-cat">Category</th>' + (showVendor ? '<th class="th-pm">Vendor</th>' : '') + '<th class="th-pm">Payment</th><th class="th-note">Note</th><th class="th-amount" style="text-align:right">Amount</th><th class="th-receipt">Receipt</th><th class="th-actions"></th></tr></thead><tbody>';
     txs.slice(0, 150).forEach(function(e){
       var catIdx = totals.findIndex(function(t){ return t.name === e.category; });
       var swatchVar = seriesVarFor(catIdx < 0 ? 0 : catIdx);
@@ -2209,7 +2327,7 @@
         html += '<td class="tx-pm">' + (vendorLabel(e) ? escapeHtml(vendorLabel(e)) : '—') + '</td>';
       }
       html += '<td class="tx-pm">' + escapeHtml(paymentLabel(e)) + '</td>';
-      html += '<td class="tx-note">' + escapeHtml(e.note || "") + '</td>';
+      html += '<td class="tx-note" title="' + escapeHtml(e.note || "") + '"><span class="tx-note-text">' + escapeHtml(e.note || "") + '</span></td>';
       html += '<td class="tx-amount">' + currencyPrecise.format(Number(e.amount) || 0) + '</td>';
       html += '<td class="tx-receipt">' + (e.receipt ? ('<img class="receipt-thumb" src="' + e.receipt + '" alt="Receipt" data-action="open-receipt" data-id="' + e.id + '">') : '—') + '</td>';
       html += '<td class="tx-actions"><button class="row-edit" data-action="edit-expense" data-id="' + e.id + '" title="Edit">Edit</button><button class="row-delete" data-action="delete-expense" data-id="' + e.id + '" title="Delete">Remove</button></td>';
@@ -2535,9 +2653,6 @@
     html += '      <button type="button" class="ghost-btn" data-action="export-csv">📤 Export all transactions (CSV)</button>';
     html += '      <label class="ghost-btn" style="cursor:pointer">📥 Import from bank CSV<input type="file" id="csv-file-input" accept=".csv,text/csv" hidden></label>';
     html += '    </div>';
-    if(state.exportText){
-      html += '    <div><div class="section-hint" style="margin-bottom:6px">Downloading isn’t available in this view — copy the text below and save it as a .csv file yourself.</div><textarea readonly style="width:100%;height:120px;font-family:\'IBM Plex Mono\',monospace;font-size:12px;background:var(--surface-2);border:1px solid var(--border-strong);border-radius:7px;padding:8px" onclick="this.select()">' + escapeHtml(state.exportText) + '</textarea></div>';
-    }
     html += renderImportPreview();
 
     html += '    <div style="border-top:1px solid var(--border);padding-top:14px;display:flex;flex-direction:column;gap:10px">';
@@ -2546,9 +2661,6 @@
     html += '        <button type="button" class="ghost-btn" data-action="export-backup">📦 Export full backup (JSON)</button>';
     html += '        <label class="ghost-btn" style="cursor:pointer">📥 Restore from backup<input type="file" id="backup-file-input" accept=".json,application/json" hidden></label>';
     html += '      </div>';
-    if(state.backupExportText){
-      html += '      <div><div class="section-hint" style="margin-bottom:6px">Downloading isn’t available in this view — copy the text below and save it as a .json file yourself.</div><textarea readonly style="width:100%;height:120px;font-family:\'IBM Plex Mono\',monospace;font-size:12px;background:var(--surface-2);border:1px solid var(--border-strong);border-radius:7px;padding:8px" onclick="this.select()">' + escapeHtml(state.backupExportText) + '</textarea></div>';
-    }
     html += renderBackupImportPreview();
     html += '    </div>';
     html += '  </div>';
@@ -2637,6 +2749,16 @@
     var signInBtn = ev.target.closest('[data-action="sign-in"]');
     if(signInBtn){
       initiateSignIn();
+      return;
+    }
+    var themeBtn = ev.target.closest('[data-action="cycle-theme"]');
+    if(themeBtn){
+      cycleTheme();
+      return;
+    }
+    var shareBtn = ev.target.closest('[data-action="share-app"]');
+    if(shareBtn){
+      shareApp();
       return;
     }
     var addGoalBtn = ev.target.closest('[data-action="add-savings-goal"]');
@@ -3649,20 +3771,22 @@
     render();
   }
 
+  function downloadFile(filename, content, mimeType){
+    var blob = new Blob([content], { type: mimeType });
+    var url = URL.createObjectURL(blob);
+    var a = document.createElement("a");
+    a.href = url;
+    a.download = filename;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  }
+
   function exportCsv(){
     var csv = buildExpensesCsv();
-    if(state.downloads){
-      state.downloads.save({ filename: "budget-ledger-export.csv", data: csv }).then(function(){
-        state.exportText = null;
-        render();
-      }).catch(function(){
-        state.exportText = csv;
-        render();
-      });
-    } else {
-      state.exportText = csv;
-      render();
-    }
+    downloadFile("budget-ledger-export.csv", csv, "text/csv");
+    showToast("Downloaded budget-ledger-export.csv");
   }
 
   function buildFullBackupObject(){
@@ -3685,18 +3809,9 @@
 
   function exportBackup(){
     var json = JSON.stringify(buildFullBackupObject(), null, 2);
-    if(state.downloads){
-      state.downloads.save({ filename: "budget-ledger-backup-" + todayStr() + ".json", data: json }).then(function(){
-        state.backupExportText = null;
-        render();
-      }).catch(function(){
-        state.backupExportText = json;
-        render();
-      });
-    } else {
-      state.backupExportText = json;
-      render();
-    }
+    var filename = "budget-ledger-backup-" + todayStr() + ".json";
+    downloadFile(filename, json, "application/json");
+    showToast("Downloaded " + filename);
   }
 
   function handleBackupJsonImport(file){
@@ -4062,9 +4177,71 @@
     }).catch(function(){ /* no sample support in this view */ });
   }
 
-  function initDownloads(){
-    if(typeof window.claude === "undefined" || typeof window.claude.use !== "function") return;
-    window.claude.use("downloads").then(function(d){ if(d) state.downloads = d; }).catch(function(){});
+  // ---------- Theme ----------
+
+  var THEME_CYCLE = ["light", "dark", "editorial"];
+  var THEME_ICON = { light: "☀️", dark: "🌙", editorial: "📰" };
+  var THEME_LABEL = { light: "Light mode", dark: "Dark mode", editorial: "Editorial mode" };
+
+  function getTheme(){
+    return localStorage.getItem("budgetLedgerTheme");
+  }
+
+  function effectiveTheme(){
+    var explicit = getTheme();
+    if(explicit) return explicit;
+    return (window.matchMedia && window.matchMedia("(prefers-color-scheme: dark)").matches) ? "dark" : "light";
+  }
+
+  function applyTheme(theme){
+    if(theme){
+      document.documentElement.setAttribute("data-theme", theme);
+    } else {
+      document.documentElement.removeAttribute("data-theme");
+    }
+    var btn = document.getElementById("theme-toggle-btn");
+    if(btn){
+      var active = effectiveTheme();
+      btn.textContent = THEME_ICON[active] || THEME_ICON.light;
+      btn.title = THEME_LABEL[active] || "Switch theme";
+      btn.setAttribute("aria-label", btn.title);
+    }
+  }
+
+  function cycleTheme(){
+    var current = effectiveTheme();
+    var idx = THEME_CYCLE.indexOf(current);
+    var next = THEME_CYCLE[(idx + 1) % THEME_CYCLE.length];
+    localStorage.setItem("budgetLedgerTheme", next);
+    applyTheme(next);
+  }
+
+  // ---------- Share ----------
+
+  function showToast(msg){
+    var el = document.getElementById("toast");
+    if(!el) return;
+    el.textContent = msg;
+    el.classList.add("show");
+    clearTimeout(showToast._t);
+    showToast._t = setTimeout(function(){ el.classList.remove("show"); }, 2200);
+  }
+
+  function shareApp(){
+    var url = window.location.href;
+    if(navigator.share){
+      navigator.share({ title: document.title, url: url }).catch(function(){});
+      return;
+    }
+    if(navigator.clipboard && navigator.clipboard.writeText){
+      navigator.clipboard.writeText(url).then(function(){
+        showToast("Link copied to clipboard!");
+      }).catch(function(){
+        prompt("Copy this link:", url);
+      });
+    } else {
+      prompt("Copy this link:", url);
+    }
   }
 
   // ---------- Persistent Google Auth ----------
@@ -4503,12 +4680,12 @@
   function init(){
     state.budgets.personal = DEFAULT_BUDGETS.personal;
     state.budgets.wedding = DEFAULT_BUDGETS.wedding;
+    applyTheme(getTheme());
     initOfflineSupport();
     renderAuthUI();
     updateOverBudgetCategories();
     render();
     initSample();
-    initDownloads();
 
     if(!driveConfigured()){
       showBanner("This copy hasn't been set up with a Google Client ID yet, so what's shown below are starter placeholders that won't be saved. See the \"GOOGLE DRIVE SETUP\" comment near the top of the file for the one-time steps.", { warn: true });
