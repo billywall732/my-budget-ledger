@@ -31,6 +31,10 @@
     --chart-expense: #ab5c49;
     --chart-income: #5c8567;
 
+    --chart-salary-net: #2a78d6;
+    --chart-salary-pretax: #b8860a;
+    --chart-salary-tax: #b23a3a;
+
     --series-1: #2a78d6;
     --series-2: #eb6834;
     --series-3: #1baf7a;
@@ -69,6 +73,10 @@
       --chart-expense: #c98a78;
       --chart-income: #85ac90;
 
+      --chart-salary-net: #3987e5;
+      --chart-salary-pretax: #9c7a10;
+      --chart-salary-tax: #e66767;
+
       --series-1: #3987e5;
       --series-2: #d95926;
       --series-3: #199e70;
@@ -105,6 +113,10 @@
     --chart-expense: #c98a78;
     --chart-income: #85ac90;
 
+    --chart-salary-net: #3987e5;
+    --chart-salary-pretax: #9c7a10;
+    --chart-salary-tax: #e66767;
+
     --series-1: #3987e5;
     --series-2: #d95926;
     --series-3: #199e70;
@@ -139,6 +151,10 @@
 
     --chart-expense: #8a4a3a;
     --chart-income: #2f4a3a;
+
+    --chart-salary-net: #2a6e9e;
+    --chart-salary-pretax: #b8860a;
+    --chart-salary-tax: #b23a3a;
 
     --series-1: #2a4a78;
     --series-2: #8a4a1f;
@@ -713,13 +729,14 @@
   .cat-list{ display: flex; flex-direction: column; }
   .cat-row{
     display: grid;
-    grid-template-columns: 150px 1fr 128px 28px;
+    grid-template-columns: 150px 1fr 128px 60px;
     align-items: center;
     gap: 14px;
     padding: 12px 16px;
     border-bottom: 1px solid var(--border);
   }
   .cat-row:last-child{ border-bottom: none; }
+  .cat-row-actions{ display: flex; gap: 2px; justify-content: flex-end; }
   .cat-row.clickable{ cursor: pointer; grid-template-columns: 150px 1fr 128px 16px; }
   .cat-row.clickable:hover{ background: var(--surface-2); }
   .cat-name{
@@ -1213,6 +1230,7 @@
     }
     .cat-row .cat-name{ grid-area: name; }
     .cat-row .edit-budget-btn{ grid-area: edit; }
+    .cat-row .cat-row-actions{ grid-area: edit; }
     .cat-row .cat-chevron{ grid-area: edit; }
     .cat-row .bar-track{ grid-area: bar; }
     .cat-row .cat-amounts{ grid-area: amounts; text-align: left; }
@@ -1266,10 +1284,10 @@
   var SERIES_VARS = ["--series-1","--series-2","--series-3","--series-4","--series-5","--series-6","--series-7","--series-8"];
 
   var PAYMENT_TYPES = [
-    { id: "cash", label: "Cash", emoji: "💵", needsCard: false },
-    { id: "bank_transfer", label: "Bank Transfer", emoji: "🏦", needsCard: false },
-    { id: "credit", label: "Credit Card", emoji: "💳", needsCard: true },
-    { id: "miles", label: "Miles / Points", emoji: "✈️", needsCard: true }
+    { id: "cash", label: "Cash", emoji: "💵", needsAccount: false },
+    { id: "bank_transfer", label: "Bank Transfer", emoji: "🏦", needsAccount: true, accountKind: "bank" },
+    { id: "credit", label: "Credit Card", emoji: "💳", needsAccount: true, accountKind: "card" },
+    { id: "miles", label: "Miles / Points", emoji: "✈️", needsAccount: true, accountKind: "card" }
   ];
 
   var DEFAULT_INCOME_TYPES = [
@@ -1362,23 +1380,31 @@
     personalMonth: currentMonthKey(),
     sample: null,
     sampleImagesOk: false,
-    downloads: null,
     scanTracker: null,
     budgets: { personal: null, wedding: null },
     expenses: [],
     paymentMethods: { items: [] },
+    bankAccounts: { items: [] },
     subscriptions: { personal: { items: [] }, wedding: { items: [] } },
     income: { personal: { items: [] }, wedding: { items: [] } },
     incomeTypes: null,
     recurringIncome: { personal: { items: [] }, wedding: { items: [] } },
-    salarySetup: { annualSalary: 0, payFrequency: "biweekly", deductions: [] },
+    salarySetup: { annualSalary: 0, payFrequency: "biweekly", deductions: [], startDate: null },
     vendors: { wedding: { items: [] } },
     pendingReceipt: { personal: null, wedding: null },
     editingCategory: null,
     editingExpense: null,
     editingDeduction: null,
+    editingSubscription: null,
+    editingRecurringIncome: null,
+    subscriptionsExpanded: { personal: false, wedding: false },
+    recurringIncomeExpanded: { personal: false, wedding: false },
     expandedCategory: null,
-    logFilter: { personal: { q: "", category: "", type: "" }, wedding: { q: "", category: "", type: "" } },
+    logFilter: {
+      personal: { q: "", category: "", subcategory: "", type: "", txType: "", dateFrom: "", dateTo: "", amountMin: "", amountMax: "" },
+      wedding: { q: "", category: "", subcategory: "", type: "", txType: "", dateFrom: "", dateTo: "", amountMin: "", amountMax: "" }
+    },
+    logFilterExpanded: { personal: false, wedding: false },
     importPreview: null,
     backupImportPreview: null,
     backupImportError: null,
@@ -1458,6 +1484,14 @@
     return (state.paymentMethods.items || []).find(function(p){ return p.id === id; }) || null;
   }
 
+  function bankAccountById(id){
+    return (state.bankAccounts.items || []).find(function(p){ return p.id === id; }) || null;
+  }
+
+  function accountById(kind, id){
+    return kind === "bank" ? bankAccountById(id) : paymentMethodById(id);
+  }
+
   function paymentTypeMeta(id){
     return PAYMENT_TYPES.find(function(t){ return t.id === id; }) || PAYMENT_TYPES[0];
   }
@@ -1473,9 +1507,9 @@
 
   function paymentLabel(e){
     var meta = paymentTypeMeta(e.paymentType || "cash");
-    if(meta.needsCard){
-      var card = e.cardId ? paymentMethodById(e.cardId) : null;
-      return meta.emoji + " " + meta.label + (card ? " — " + card.name + (card.last4 ? " ••" + card.last4 : "") : "");
+    if(meta.needsAccount){
+      var acct = e.cardId ? accountById(meta.accountKind, e.cardId) : null;
+      return meta.emoji + " " + meta.label + (acct ? " — " + acct.name + (acct.last4 ? " ••" + acct.last4 : "") : "");
     }
     return meta.emoji + " " + meta.label;
   }
@@ -1556,6 +1590,24 @@
     return totals;
   }
 
+  function topExpenseThisMonth(tracker, monthKey){
+    var top = null;
+    state.expenses.forEach(function(e){
+      if(e.tracker !== tracker || !inMonth(e.date, monthKey)) return;
+      if(!top || (Number(e.amount) || 0) > (Number(top.amount) || 0)) top = e;
+    });
+    return top;
+  }
+
+  function topNonSalaryIncomeThisMonth(tracker, monthKey){
+    var top = null;
+    (state.income[tracker] && state.income[tracker].items || []).forEach(function(i){
+      if(i.type === "salary" || !inMonth(i.date, monthKey)) return;
+      if(!top || (Number(i.amount) || 0) > (Number(top.amount) || 0)) top = i;
+    });
+    return top;
+  }
+
   function vendorById(id){
     return (state.vendors.wedding && state.vendors.wedding.items || []).find(function(v){ return v.id === id; }) || null;
   }
@@ -1582,6 +1634,7 @@
     }
     state.expenses.forEach(function(e){ if(e.tracker === tracker && e.vendor) set[e.vendor] = true; });
     (state.subscriptions[tracker] && state.subscriptions[tracker].items || []).forEach(function(s){ if(s.vendor) set[s.vendor] = true; });
+    (state.recurringIncome[tracker] && state.recurringIncome[tracker].items || []).forEach(function(r){ if(r.vendor) set[r.vendor] = true; });
     return Object.keys(set).sort();
   }
 
@@ -1598,6 +1651,15 @@
     var doc = state.budgets[tracker];
     var cat = doc && (doc.categories || []).find(function(c){ return c.name === categoryName; });
     return (cat && cat.subcategories) || [];
+  }
+
+  function allSubcategoriesFor(tracker){
+    var doc = state.budgets[tracker];
+    var set = {};
+    ((doc && doc.categories) || []).forEach(function(c){
+      (c.subcategories || []).forEach(function(s){ set[s] = true; });
+    });
+    return Object.keys(set).sort();
   }
 
   function subcategoryOptionsHtml(tracker, categoryName, selected){
@@ -1640,13 +1702,14 @@
   }
 
   function buildExpensesCsv(){
-    var rows = [["Tracker", "Date", "Category", "Subcategory", "Vendor", "Payment Type", "Card", "Amount", "Note"]];
+    var rows = [["Tracker", "Date", "Category", "Subcategory", "Vendor", "Payment Type", "Card/Account", "Amount", "Note"]];
     state.expenses.slice().sort(function(a, b){ return (a.date || "").localeCompare(b.date || ""); }).forEach(function(e){
-      var card = e.cardId ? paymentMethodById(e.cardId) : null;
+      var meta = paymentTypeMeta(e.paymentType || "cash");
+      var acct = e.cardId ? accountById(meta.accountKind, e.cardId) : null;
       rows.push([
         e.tracker, e.date || "", e.category || "", e.subcategory || "", vendorLabel(e),
-        paymentTypeMeta(e.paymentType || "cash").label,
-        card ? card.name + (card.last4 ? " ••" + card.last4 : "") : "",
+        meta.label,
+        acct ? acct.name + (acct.last4 ? " ••" + acct.last4 : "") : "",
         (Number(e.amount) || 0).toFixed(2), e.note || ""
       ]);
     });
@@ -1750,10 +1813,19 @@
   function cardTotals(){
     var totals = {};
     state.expenses.forEach(function(e){
-      if(!e.cardId) return;
+      if(!e.cardId || (e.paymentType !== "credit" && e.paymentType !== "miles")) return;
       if(!totals[e.cardId]) totals[e.cardId] = { credit: 0, miles: 0 };
       if(e.paymentType === "miles") totals[e.cardId].miles += Number(e.amount) || 0;
       else totals[e.cardId].credit += Number(e.amount) || 0;
+    });
+    return totals;
+  }
+
+  function bankAccountTotals(){
+    var totals = {};
+    state.expenses.forEach(function(e){
+      if(!e.cardId || e.paymentType !== "bank_transfer") return;
+      totals[e.cardId] = (totals[e.cardId] || 0) + (Number(e.amount) || 0);
     });
     return totals;
   }
@@ -1766,21 +1838,26 @@
     return '<div class="stat-tile"><div class="stat-label">' + escapeHtml(label) + '</div><div class="stat-value">' + value + '</div>' + (extra || '') + '</div>';
   }
 
-  function paymentSelectOptions(selectedId){
-    return (state.paymentMethods.items || []).map(function(p){
+  function accountSelectOptions(kind, selectedId){
+    var list = kind === "bank" ? (state.bankAccounts.items || []) : (state.paymentMethods.items || []);
+    return list.map(function(p){
       return '<option value="' + p.id + '"' + (p.id === selectedId ? ' selected' : '') + '>' + escapeHtml(p.name) + (p.last4 ? ' ••' + escapeHtml(p.last4) : '') + '</option>';
     }).join("");
   }
 
   function paymentTypeFieldHtml(namePrefix, selectedType, selectedCard){
     selectedType = selectedType || "cash";
-    var needsCard = paymentTypeMeta(selectedType).needsCard;
+    var meta = paymentTypeMeta(selectedType);
+    var needsAccount = meta.needsAccount;
+    var kind = meta.accountKind || "card";
+    var fieldLabel = kind === "bank" ? "Bank account" : "Card";
+    var placeholder = kind === "bank" ? "Choose a bank account…" : "Choose a card…";
     var html = '<div class="field"><label>Payment</label><select name="' + namePrefix + 'Type" data-role="ptype-select">';
     PAYMENT_TYPES.forEach(function(t){
       html += '<option value="' + t.id + '"' + (t.id === selectedType ? ' selected' : '') + '>' + t.emoji + ' ' + t.label + '</option>';
     });
     html += '</select></div>';
-    html += '<div class="field" data-role="card-field" style="' + (needsCard ? '' : 'display:none') + '"><label>Card</label><select name="' + namePrefix + 'Card"' + (needsCard ? ' required' : '') + '><option value="">Choose a card…</option>' + paymentSelectOptions(selectedCard) + '</select></div>';
+    html += '<div class="field" data-role="card-field" style="' + (needsAccount ? '' : 'display:none') + '"><label data-role="card-field-label">' + fieldLabel + '</label><select name="' + namePrefix + 'Card"' + (needsAccount ? ' required' : '') + '><option value="">' + placeholder + '</option>' + accountSelectOptions(kind, selectedCard) + '</select></div>';
     return html;
   }
 
@@ -1826,6 +1903,35 @@
     return html;
   }
 
+  function renderBankAccountsSection(){
+    var items = state.bankAccounts.items || [];
+    var totals = bankAccountTotals();
+    var html = '<section>';
+    html += '  <div class="section-head"><span class="section-title">🏦 Bank accounts</span><span class="section-hint">Nickname and last 4 digits only — never a full account number.</span></div>';
+    html += '  <div class="card pm-body">';
+    if(items.length === 0){
+      html += '<div class="pm-empty">No bank accounts yet. Add one below to tag bank transfer expenses by which account you paid from.</div>';
+    } else {
+      html += '<div class="pm-list">';
+      items.forEach(function(p){
+        var total = totals[p.id] || 0;
+        html += '<div class="pm-chip"><span class="pm-name">' + escapeHtml(p.name) + '</span>' +
+          (p.last4 ? '<span class="pm-last4">••' + escapeHtml(p.last4) + '</span>' : '') +
+          '<span class="pm-total">' + currency.format(total) + ' transferred</span>' +
+          '<button class="pm-remove" data-action="remove-bank-account" data-id="' + p.id + '" title="Remove bank account">✕</button></div>';
+      });
+      html += '</div>';
+    }
+    html += '  <form class="pm-add-form" data-action="add-bank-account">';
+    html += '    <div class="field"><label>Account nickname</label><input type="text" name="name" placeholder="e.g. Chase Checking" maxlength="40" required></div>';
+    html += '    <div class="field narrow"><label>Last 4</label><input type="text" name="last4" placeholder="1234" maxlength="4" pattern="[0-9]{0,4}"></div>';
+    html += '    <button type="submit" class="ghost-btn">+ Add account</button>';
+    html += '  </form>';
+    html += '  </div>';
+    html += '</section>';
+    return html;
+  }
+
   function renderCategoriesManageSection(tracker){
     var totals = categoryTotals(tracker, null);
     var hint = (state.budgets[tracker] && state.budgets[tracker].hint) || "";
@@ -1848,7 +1954,7 @@
         html += '  <button class="edit-budget-btn" data-action="save-budget" data-tracker="' + tracker + '" data-name="' + escapeHtml(c.name) + '" title="Save">✓</button>';
       } else {
         html += '  <div class="cat-amounts' + (c.spent > c.budget && c.budget > 0 ? ' over' : '') + '"><b>' + currency.format(c.spent) + '</b> / ' + currency.format(c.budget) + milesNote(c) + '</div>';
-        html += '  <button class="edit-budget-btn" data-action="edit-budget" data-tracker="' + tracker + '" data-name="' + escapeHtml(c.name) + '" title="Edit budget">✎</button>';
+        html += '  <div class="cat-row-actions"><button class="edit-budget-btn" data-action="edit-budget" data-tracker="' + tracker + '" data-name="' + escapeHtml(c.name) + '" title="Edit budget">✎</button><button class="edit-budget-btn" data-action="remove-category" data-tracker="' + tracker + '" data-name="' + escapeHtml(c.name) + '" title="Remove category">🗑</button></div>';
       }
       html += '</div>';
       if(isExpanded){
@@ -1876,41 +1982,69 @@
     return html;
   }
 
+  function renderSubscriptionRowEditForm(tracker, s, totals){
+    var html = '<form class="sub-add-form" data-action="save-subscription-edit" data-tracker="' + tracker + '" data-id="' + s.id + '">';
+    html += '  <div class="field"><label>Name</label><input type="text" name="name" value="' + escapeHtml(s.name) + '" maxlength="40" required></div>';
+    html += '  <div class="field"><label>Amount</label><input type="number" name="amount" min="0" step="0.01" value="' + (Number(s.amount) || 0) + '" required></div>';
+    html += '  <div class="field"><label>Cycle</label><select name="cycle"><option value="monthly"' + (s.cycle !== "yearly" ? ' selected' : '') + '>Monthly</option><option value="yearly"' + (s.cycle === "yearly" ? ' selected' : '') + '>Yearly</option></select></div>';
+    html += '  <div class="field"><label>Category</label><select name="category" data-role="sub-edit-cat-select">' + totals.map(function(c){ return '<option value="' + escapeHtml(c.name) + '"' + (c.name === s.category ? ' selected' : '') + '>' + escapeHtml(c.name) + '</option>'; }).join("") + '</select></div>';
+    html += '  <div class="field"><label>Subcategory</label><select name="subcategory" data-role="sub-edit-subcat-select">' + subcategoryOptionsHtml(tracker, s.category, s.subcategory || "") + '</select></div>';
+    html += '  <div class="field"><label>Vendor / Payee</label><input type="text" name="vendor" list="vendor-dl-sub-' + tracker + '" value="' + escapeHtml(s.vendor || "") + '" maxlength="60"></div>';
+    html += paymentTypeFieldHtml("subEdit", s.paymentType || "cash", s.cardId || "");
+    html += '  <div class="field"><label>Next date</label><input type="date" name="nextDate" value="' + escapeHtml(s.nextDate || todayStr()) + '"></div>';
+    html += '  <div class="field note-field"><label>Note</label><input type="text" name="note" value="' + escapeHtml(s.note || "") + '" placeholder="Optional" maxlength="200"></div>';
+    html += '  <span class="sub-actions"><button type="button" class="mini-btn" data-action="cancel-edit-subscription">Cancel</button><button type="submit" class="mini-btn">Save</button></span>';
+    html += '</form>';
+    return html;
+  }
+
   function renderSubscriptionsSection(tracker){
     var totals = categoryTotals(tracker, null);
     var items = (state.subscriptions[tracker] && state.subscriptions[tracker].items) || [];
     var sorted = items.slice().sort(function(a, b){ return (a.nextDate || "").localeCompare(b.nextDate || ""); });
     var monthlyTotal = items.reduce(function(s, i){ return s + (i.cycle === "yearly" ? (Number(i.amount) || 0) / 12 : (Number(i.amount) || 0)); }, 0);
+    var isExpandedList = !!(state.subscriptionsExpanded && state.subscriptionsExpanded[tracker]);
 
     var html = '<section>';
-    html += '  <div class="section-head"><span class="section-title">🔁 Subscriptions</span><span class="section-hint">' + (items.length ? ('~' + currency.format(monthlyTotal) + '/mo recurring') : 'Recurring payments, tracked separately from one-off expenses') + '</span></div>';
+    html += '  <div class="section-head"><span class="section-title">🔁 Subscriptions</span><span class="section-hint">' + (items.length ? ('~' + currency.format(monthlyTotal) + '/mo recurring — applied automatically on its scheduled date') : 'Recurring payments, tracked separately from one-off expenses') + '</span></div>';
     html += '  <div class="card">';
     if(sorted.length === 0){
       html += '<div class="sub-empty">No subscriptions added yet.</div>';
     } else {
-      html += '<div class="sub-list">';
-      sorted.forEach(function(s){
-        html += '<div class="sub-row">';
-        html += '  <span class="sub-name">' + escapeHtml(s.name) + '</span>';
-        html += '  <span class="sub-cycle-badge">' + (s.cycle === "yearly" ? "Yearly" : "Monthly") + '</span>';
-        html += '  <span class="sub-meta">' + escapeHtml(s.category || "Uncategorized") + '</span>';
-        if(s.vendor) html += '  <span class="sub-meta">' + escapeHtml(s.vendor) + '</span>';
-        html += '  <span class="sub-meta">' + escapeHtml(paymentLabel(s)) + '</span>';
-        html += '  <span class="sub-meta">Next ' + fmtDate(s.nextDate) + '</span>';
-        html += '  <span class="sub-amount">' + currency.format(s.amount) + '</span>';
-        html += '  <span class="sub-actions"><button class="mini-btn" data-action="log-subscription" data-tracker="' + tracker + '" data-id="' + s.id + '">Log payment</button><button class="mini-btn danger" data-action="remove-subscription" data-tracker="' + tracker + '" data-id="' + s.id + '">Remove</button></span>';
+      html += '  <button type="button" class="subcat-toggle" style="margin:14px 0 0 16px" data-action="toggle-subscriptions-list" data-tracker="' + tracker + '">🔁 ' + sorted.length + ' subscription' + (sorted.length === 1 ? '' : 's') + (isExpandedList ? ' ▴' : ' ▾') + '</button>';
+      if(isExpandedList){
+        html += '<div class="sub-list">';
+        sorted.forEach(function(s){
+          var isEditing = state.editingSubscription && state.editingSubscription.tracker === tracker && state.editingSubscription.id === s.id;
+          if(isEditing){
+            html += renderSubscriptionRowEditForm(tracker, s, totals);
+            return;
+          }
+          html += '<div class="sub-row">';
+          html += '  <span class="sub-name">' + escapeHtml(s.name) + '</span>';
+          html += '  <span class="sub-cycle-badge">' + (s.cycle === "yearly" ? "Yearly" : "Monthly") + '</span>';
+          html += '  <span class="sub-meta">' + escapeHtml(s.category || "Uncategorized") + (s.subcategory ? ' · ' + escapeHtml(s.subcategory) : '') + '</span>';
+          if(s.vendor) html += '  <span class="sub-meta">' + escapeHtml(s.vendor) + '</span>';
+          html += '  <span class="sub-meta">' + escapeHtml(paymentLabel(s)) + '</span>';
+          html += '  <span class="sub-meta">Next ' + fmtDate(s.nextDate) + '</span>';
+          if(s.note) html += '  <span class="sub-meta">' + escapeHtml(s.note) + '</span>';
+          html += '  <span class="sub-amount">' + currency.format(s.amount) + '</span>';
+          html += '  <span class="sub-actions"><button class="mini-btn" data-action="edit-subscription" data-tracker="' + tracker + '" data-id="' + s.id + '">Edit</button><button class="mini-btn danger" data-action="remove-subscription" data-tracker="' + tracker + '" data-id="' + s.id + '">Remove</button></span>';
+          html += '</div>';
+        });
         html += '</div>';
-      });
-      html += '</div>';
+      }
     }
     html += '  <form class="sub-add-form" data-action="add-subscription" data-tracker="' + tracker + '">';
     html += '    <div class="field"><label>Name</label><input type="text" name="name" placeholder="e.g. Spotify" maxlength="40" required></div>';
     html += '    <div class="field"><label>Amount</label><input type="number" name="amount" min="0" step="0.01" placeholder="0.00" required></div>';
     html += '    <div class="field"><label>Cycle</label><select name="cycle"><option value="monthly">Monthly</option><option value="yearly">Yearly</option></select></div>';
-    html += '    <div class="field"><label>Category</label><select name="category">' + totals.map(function(c){ return '<option value="' + escapeHtml(c.name) + '">' + escapeHtml(c.name) + '</option>'; }).join("") + '</select></div>';
+    html += '    <div class="field"><label>Category</label><select name="category" data-role="sub-cat-select">' + totals.map(function(c){ return '<option value="' + escapeHtml(c.name) + '">' + escapeHtml(c.name) + '</option>'; }).join("") + '</select></div>';
+    html += '    <div class="field"><label>Subcategory</label><select name="subcategory" data-role="sub-subcat-select">' + subcategoryOptionsHtml(tracker, totals[0] ? totals[0].name : "", "") + '</select></div>';
     html += '    <div class="field"><label>Vendor / Payee</label><input type="text" name="vendor" list="vendor-dl-sub-' + tracker + '" placeholder="e.g. Spotify" maxlength="60"></div>';
     html += paymentTypeFieldHtml("sub", "cash", "");
     html += '    <div class="field"><label>Next date</label><input type="date" name="nextDate" value="' + todayStr() + '"></div>';
+    html += '    <div class="field note-field"><label>Note</label><input type="text" name="note" placeholder="Optional" maxlength="200"></div>';
     html += '    <button type="submit" class="submit-btn neutral">Add</button>';
     html += vendorDatalistHtml(tracker, "vendor-dl-sub-" + tracker);
     html += '  </form>';
@@ -1991,6 +2125,24 @@
     html += statTile("💸 Spent", currency.format(totalSpent), totalMiles > 0 ? '<div class="section-hint" style="margin-top:6px">✈️ ' + currency.format(totalMiles) + ' via miles</div>' : '');
     html += statTile(remaining < 0 ? "⚠️ Over by" : "✅ Remaining", currency.format(Math.abs(remaining)),
       '<span class="status-chip ' + overallStatus + '"><span class="dot"></span>' + statusLabel + '</span>');
+    html += '  </div>';
+    html += '</section>';
+
+    html += '<section>';
+    html += '  <div class="section-head"><span class="section-title">💡 Financial highlights</span></div>';
+    html += '  <div class="stat-row">';
+    var topExp = topExpenseThisMonth(tracker, monthKey);
+    html += statTile("🔺 Top monthly expense",
+      topExp ? currency.format(topExp.amount) : "—",
+      '<div class="section-hint" style="margin-top:6px">' + (topExp ? (escapeHtml(topExp.category || "Other") + (topExp.note ? ' · ' + escapeHtml(topExp.note) : "")) : "No expenses this month") + '</div>');
+    var topInc = topNonSalaryIncomeThisMonth(tracker, monthKey);
+    html += statTile("💵 Top non-salary income",
+      topInc ? currency.format(topInc.amount) : "—",
+      '<div class="section-hint" style="margin-top:6px">' + (topInc ? escapeHtml(topInc.source || "") : "None this month") + '</div>');
+    var overBudgetList = state.overBudgetCategories[tracker] || [];
+    html += statTile(overBudgetList.length > 0 ? "⚠️ Overbudget categories" : "✅ Overbudget categories",
+      String(overBudgetList.length),
+      '<div class="section-hint" style="margin-top:6px">' + (overBudgetList.length > 0 ? (overBudgetList.slice(0, 3).map(function(c){ return escapeHtml(c.name); }).join(", ") + (overBudgetList.length > 3 ? "…" : "")) : "All categories on track") + '</div>');
     html += '  </div>';
     html += '</section>';
 
@@ -2280,12 +2432,29 @@
     html += renderSubscriptionsSection(tracker);
 
     var f = state.logFilter[tracker];
+    var filterInputStyle = "font-size:13.5px;background:var(--surface-2);border:1px solid var(--border-strong);border-radius:7px;padding:7px 10px;color:var(--text-primary)";
+    var isFilterExpanded = !!(state.logFilterExpanded && state.logFilterExpanded[tracker]);
     html += '<section>';
     html += '  <div class="section-head"><span class="section-title">📒 Full transaction log</span></div>';
-    html += '  <div class="card" style="padding:12px 16px;display:flex;gap:10px;flex-wrap:wrap">';
-    html += '    <input type="text" id="log-search-' + tracker + '" placeholder="🔍 Search notes or categories…" value="' + escapeHtml(f.q) + '" style="flex:2 1 180px;font-family:\'Work Sans\',sans-serif;font-size:13.5px;background:var(--surface-2);border:1px solid var(--border-strong);border-radius:7px;padding:7px 10px;color:var(--text-primary)">';
-    html += '    <select id="log-filter-cat-' + tracker + '" style="flex:1 1 130px;font-size:13.5px;background:var(--surface-2);border:1px solid var(--border-strong);border-radius:7px;padding:7px 10px;color:var(--text-primary)"><option value="">All categories</option>' + totals.map(function(c){ return '<option value="' + escapeHtml(c.name) + '"' + (f.category === c.name ? ' selected' : '') + '>' + escapeHtml(c.name) + '</option>'; }).join("") + '</select>';
-    html += '    <select id="log-filter-type-' + tracker + '" style="flex:1 1 130px;font-size:13.5px;background:var(--surface-2);border:1px solid var(--border-strong);border-radius:7px;padding:7px 10px;color:var(--text-primary)"><option value="">All payment types</option>' + PAYMENT_TYPES.map(function(t){ return '<option value="' + t.id + '"' + (f.type === t.id ? ' selected' : '') + '>' + t.emoji + ' ' + t.label + '</option>'; }).join("") + '</select>';
+    html += '  <div class="card" style="padding:12px 16px;display:flex;flex-direction:column;gap:10px">';
+    html += '    <div style="display:flex;gap:10px;flex-wrap:wrap">';
+    html += '      <input type="text" id="log-search-' + tracker + '" placeholder="🔍 Search notes or categories…" value="' + escapeHtml(f.q) + '" style="flex:2 1 180px;font-family:\'Work Sans\',sans-serif;' + filterInputStyle + '">';
+    html += '      <select id="log-filter-cat-' + tracker + '" style="flex:1 1 130px;' + filterInputStyle + '"><option value="">All categories</option>' + totals.map(function(c){ return '<option value="' + escapeHtml(c.name) + '"' + (f.category === c.name ? ' selected' : '') + '>' + escapeHtml(c.name) + '</option>'; }).join("") + '</select>';
+    html += '      <select id="log-filter-type-' + tracker + '" style="flex:1 1 130px;' + filterInputStyle + '"><option value="">All payment types</option>' + PAYMENT_TYPES.map(function(t){ return '<option value="' + t.id + '"' + (f.type === t.id ? ' selected' : '') + '>' + t.emoji + ' ' + t.label + '</option>'; }).join("") + '</select>';
+    html += '      <button type="button" class="subcat-toggle" data-action="toggle-log-filters" data-tracker="' + tracker + '">⚙️ More filters' + (isFilterExpanded ? ' ▴' : ' ▾') + '</button>';
+    html += '    </div>';
+    if(isFilterExpanded){
+      var subOptions = f.category ? subcategoriesFor(tracker, f.category) : allSubcategoriesFor(tracker);
+      html += '    <div style="display:flex;gap:10px;flex-wrap:wrap;padding-top:10px;border-top:1px solid var(--border)">';
+      html += '      <select id="log-filter-subcat-' + tracker + '" style="flex:1 1 150px;' + filterInputStyle + '"><option value="">All subcategories</option>' + subOptions.map(function(s){ return '<option value="' + escapeHtml(s) + '"' + (f.subcategory === s ? ' selected' : '') + '>' + escapeHtml(s) + '</option>'; }).join("") + '</select>';
+      html += '      <select id="log-filter-txtype-' + tracker + '" style="flex:1 1 150px;' + filterInputStyle + '"><option value="">All transaction types</option><option value="subscription"' + (f.txType === "subscription" ? ' selected' : '') + '>🔁 Subscription</option><option value="one_time"' + (f.txType === "one_time" ? ' selected' : '') + '>🧾 One-time</option></select>';
+      html += '      <label style="display:flex;align-items:center;gap:6px;font-size:12.5px;color:var(--text-secondary)">From <input type="date" id="log-filter-datefrom-' + tracker + '" value="' + escapeHtml(f.dateFrom) + '" style="' + filterInputStyle + '"></label>';
+      html += '      <label style="display:flex;align-items:center;gap:6px;font-size:12.5px;color:var(--text-secondary)">To <input type="date" id="log-filter-dateto-' + tracker + '" value="' + escapeHtml(f.dateTo) + '" style="' + filterInputStyle + '"></label>';
+      html += '      <label style="display:flex;align-items:center;gap:6px;font-size:12.5px;color:var(--text-secondary)">Min $ <input type="number" min="0" step="0.01" id="log-filter-amountmin-' + tracker + '" value="' + escapeHtml(f.amountMin) + '" placeholder="0.00" style="width:90px;' + filterInputStyle + '"></label>';
+      html += '      <label style="display:flex;align-items:center;gap:6px;font-size:12.5px;color:var(--text-secondary)">Max $ <input type="number" min="0" step="0.01" id="log-filter-amountmax-' + tracker + '" value="' + escapeHtml(f.amountMax) + '" placeholder="0.00" style="width:90px;' + filterInputStyle + '"></label>';
+      html += '      <button type="button" class="ghost-btn" data-action="clear-log-filters" data-tracker="' + tracker + '">✕ Clear filters</button>';
+      html += '    </div>';
+    }
     html += '  </div>';
     html += '  <div class="card table-scroll" id="log-table-wrap-' + tracker + '" style="margin-top:10px">' + renderLogTableHtml(tracker) + '</div>';
     html += '</section>';
@@ -2295,10 +2464,19 @@
   function filteredLogTxs(tracker){
     var totals = categoryTotals(tracker, null);
     var f = state.logFilter[tracker];
+    var amountMin = parseFloat(f.amountMin);
+    var amountMax = parseFloat(f.amountMax);
     var txs = state.expenses.filter(function(e){
       if(e.tracker !== tracker) return false;
       if(f.category && e.category !== f.category) return false;
+      if(f.subcategory && (e.subcategory || "") !== f.subcategory) return false;
       if(f.type && (e.paymentType || "cash") !== f.type) return false;
+      if(f.txType === "subscription" && !e.subscriptionId) return false;
+      if(f.txType === "one_time" && e.subscriptionId) return false;
+      if(f.dateFrom && (e.date || "") < f.dateFrom) return false;
+      if(f.dateTo && (e.date || "") > f.dateTo) return false;
+      if(!isNaN(amountMin) && (Number(e.amount) || 0) < amountMin) return false;
+      if(!isNaN(amountMax) && (Number(e.amount) || 0) > amountMax) return false;
       if(f.q){
         var q = f.q.toLowerCase();
         var hay = ((e.note || "") + " " + (e.category || "") + " " + paymentLabel(e)).toLowerCase();
@@ -2393,6 +2571,7 @@
     if(tracker === "personal") html += renderSavingsGoalsSection();
     html += renderCategoriesManageSection(tracker);
     html += renderPaymentMethodsSection();
+    html += renderBankAccountsSection();
     if(tracker === "wedding") html += renderVendorsSection();
     html += renderChangeLogSection(tracker);
     html += renderDataSection();
@@ -2428,42 +2607,162 @@
     return html;
   }
 
+  function renderRecurringIncomeRowEditForm(tracker, r, types){
+    var html = '<form class="sub-add-form" data-action="save-recurring-income-edit" data-tracker="' + tracker + '" data-id="' + r.id + '">';
+    html += '  <div class="field"><label>Source</label><input type="text" name="source" value="' + escapeHtml(r.source) + '" maxlength="60" required></div>';
+    html += '  <div class="field"><label>Type</label><select name="incomeType">' + types.map(function(t){ return '<option value="' + t.id + '"' + (t.id === (r.type || "other") ? ' selected' : '') + '>' + t.emoji + ' ' + t.label + '</option>'; }).join("") + '</select></div>';
+    html += '  <div class="field"><label>Subcategory</label><input type="text" name="subcategory" value="' + escapeHtml(r.subcategory || "") + '" placeholder="Optional" maxlength="40"></div>';
+    html += '  <div class="field"><label>Amount</label><input type="number" name="amount" min="0" step="0.01" value="' + (Number(r.amount) || 0) + '" required></div>';
+    html += '  <div class="field"><label>Frequency</label><select name="frequency">' + INCOME_FREQUENCIES.map(function(f){ return '<option value="' + f.id + '"' + (f.id === r.frequency ? ' selected' : '') + '>' + f.label + '</option>'; }).join("") + '</select></div>';
+    html += '  <div class="field"><label>Vendor / Payer</label><input type="text" name="vendor" list="vendor-dl-rinc-' + tracker + '" value="' + escapeHtml(r.vendor || "") + '" maxlength="60"></div>';
+    html += '  <div class="field"><label>Next date</label><input type="date" name="nextDate" value="' + escapeHtml(r.nextDate || todayStr()) + '"></div>';
+    html += '  <div class="field note-field"><label>Note</label><input type="text" name="note" value="' + escapeHtml(r.note || "") + '" placeholder="Optional" maxlength="200"></div>';
+    html += '  <span class="sub-actions"><button type="button" class="mini-btn" data-action="cancel-edit-recurring-income">Cancel</button><button type="submit" class="mini-btn">Save</button></span>';
+    html += '</form>';
+    return html;
+  }
+
   function renderRecurringIncomeSection(tracker){
     var items = (state.recurringIncome[tracker] && state.recurringIncome[tracker].items) || [];
     var sorted = items.slice().sort(function(a, b){ return (a.nextDate || "").localeCompare(b.nextDate || ""); });
     var types = incomeTypesList();
+    var isExpandedList = !!(state.recurringIncomeExpanded && state.recurringIncomeExpanded[tracker]);
     var html = '<section>';
-    html += '  <div class="section-head"><span class="section-title">🔁 Recurring income</span><span class="section-hint">Paychecks and other income that repeats — log each time it lands</span></div>';
+    html += '  <div class="section-head"><span class="section-title">🔁 Recurring income</span><span class="section-hint">Paychecks and other income that repeats — applied automatically on its scheduled date</span></div>';
     html += '  <div class="card">';
     if(sorted.length === 0){
       html += '<div class="sub-empty">No recurring income set up yet.</div>';
     } else {
-      html += '<div class="sub-list">';
-      sorted.forEach(function(r){
-        var typeMeta = incomeTypeMeta(r.type || "other");
-        var freqLabel = (INCOME_FREQUENCIES.find(function(f){ return f.id === r.frequency; }) || {}).label || r.frequency;
-        html += '<div class="sub-row">';
-        html += '  <span class="sub-name">' + escapeHtml(r.source) + '</span>';
-        html += '  <span class="sub-cycle-badge">' + escapeHtml(freqLabel) + '</span>';
-        html += '  <span class="sub-meta">' + typeMeta.emoji + ' ' + typeMeta.label + '</span>';
-        html += '  <span class="sub-meta">Next ' + fmtDate(r.nextDate) + '</span>';
-        html += '  <span class="sub-amount" style="color:var(--status-good)">+' + currency.format(r.amount) + '</span>';
-        html += '  <span class="sub-actions"><button class="mini-btn" data-action="log-recurring-income" data-tracker="' + tracker + '" data-id="' + r.id + '">Log payment</button><button class="mini-btn danger" data-action="remove-recurring-income" data-tracker="' + tracker + '" data-id="' + r.id + '">Remove</button></span>';
+      html += '  <button type="button" class="subcat-toggle" style="margin:14px 0 0 16px" data-action="toggle-recurring-income-list" data-tracker="' + tracker + '">🔁 ' + sorted.length + ' recurring income source' + (sorted.length === 1 ? '' : 's') + (isExpandedList ? ' ▴' : ' ▾') + '</button>';
+      if(isExpandedList){
+        html += '<div class="sub-list">';
+        sorted.forEach(function(r){
+          var isEditing = state.editingRecurringIncome && state.editingRecurringIncome.tracker === tracker && state.editingRecurringIncome.id === r.id;
+          if(isEditing){
+            html += renderRecurringIncomeRowEditForm(tracker, r, types);
+            return;
+          }
+          var typeMeta = incomeTypeMeta(r.type || "other");
+          var freqLabel = (INCOME_FREQUENCIES.find(function(f){ return f.id === r.frequency; }) || {}).label || r.frequency;
+          html += '<div class="sub-row">';
+          html += '  <span class="sub-name">' + escapeHtml(r.source) + '</span>';
+          html += '  <span class="sub-cycle-badge">' + escapeHtml(freqLabel) + '</span>';
+          html += '  <span class="sub-meta">' + typeMeta.emoji + ' ' + typeMeta.label + (r.subcategory ? ' · ' + escapeHtml(r.subcategory) : '') + '</span>';
+          if(r.vendor) html += '  <span class="sub-meta">' + escapeHtml(r.vendor) + '</span>';
+          html += '  <span class="sub-meta">Next ' + fmtDate(r.nextDate) + '</span>';
+          if(r.note) html += '  <span class="sub-meta">' + escapeHtml(r.note) + '</span>';
+          html += '  <span class="sub-amount" style="color:var(--status-good)">+' + currency.format(r.amount) + '</span>';
+          if(r.fromSalary){
+            html += '  <span class="sub-actions"><span class="sub-meta" title="Managed from the Salary page">🔒 Synced from Salary</span></span>';
+          } else {
+            html += '  <span class="sub-actions"><button class="mini-btn" data-action="edit-recurring-income" data-tracker="' + tracker + '" data-id="' + r.id + '">Edit</button><button class="mini-btn danger" data-action="remove-recurring-income" data-tracker="' + tracker + '" data-id="' + r.id + '">Remove</button></span>';
+          }
+          html += '</div>';
+        });
         html += '</div>';
-      });
-      html += '</div>';
+      }
     }
     html += '  <form class="sub-add-form" data-action="add-recurring-income" data-tracker="' + tracker + '">';
     html += '    <div class="field"><label>Source</label><input type="text" name="source" placeholder="e.g. Paycheck" maxlength="60" required></div>';
     html += '    <div class="field"><label>Type</label><select name="incomeType">' + types.map(function(t){ return '<option value="' + t.id + '"' + (t.id === "salary" ? ' selected' : '') + '>' + t.emoji + ' ' + t.label + '</option>'; }).join("") + '</select></div>';
+    html += '    <div class="field"><label>Subcategory</label><input type="text" name="subcategory" placeholder="Optional" maxlength="40"></div>';
     html += '    <div class="field"><label>Amount</label><input type="number" name="amount" min="0" step="0.01" placeholder="0.00" required></div>';
     html += '    <div class="field"><label>Frequency</label><select name="frequency">' + INCOME_FREQUENCIES.map(function(f){ return '<option value="' + f.id + '"' + (f.id === "biweekly" ? ' selected' : '') + '>' + f.label + '</option>'; }).join("") + '</select></div>';
+    html += '    <div class="field"><label>Vendor / Payer</label><input type="text" name="vendor" list="vendor-dl-rinc-' + tracker + '" placeholder="e.g. Acme Corp" maxlength="60"></div>';
     html += '    <div class="field"><label>Next date</label><input type="date" name="nextDate" value="' + todayStr() + '"></div>';
+    html += '    <div class="field note-field"><label>Note</label><input type="text" name="note" placeholder="Optional" maxlength="200"></div>';
     html += '    <button type="submit" class="submit-btn neutral">Add</button>';
+    html += vendorDatalistHtml(tracker, "vendor-dl-rinc-" + tracker);
     html += '  </form>';
     html += '  </div>';
     html += '</section>';
     return html;
+  }
+
+  function renderDeductionSection(kind, s, calc){
+    var isPretax = kind === "pretax";
+    var basisLabel = isPretax ? "gross" : "taxable income";
+    var calcDeds = isPretax ? calc.pretaxDeductions : calc.taxDeductions;
+    var html = '<section>';
+    if(isPretax){
+      html += '  <div class="section-head"><span class="section-title">➖ Pretax deductions</span><span class="section-hint">401k, HSA, health insurance — reduce your taxable income before taxes are applied</span></div>';
+    } else {
+      html += '  <div class="section-head"><span class="section-title">➖ Tax deductions</span><span class="section-hint">Federal, state, FICA — applied to taxable income (gross minus pretax deductions) to reach net pay</span></div>';
+    }
+    html += '  <div class="card">';
+    if(calcDeds.length === 0){
+      html += '<div class="sub-empty">' + (isPretax ? 'No pretax deductions yet — taxable income equals gross until you add some.' : 'No tax deductions yet — net pay equals taxable income until you add some.') + '</div>';
+    } else {
+      html += '<div class="sub-list">';
+      calcDeds.forEach(function(d){
+        if(state.editingDeduction === d.id){
+          html += '<form class="sub-add-form" data-action="save-deduction-edit" data-id="' + d.id + '" style="padding:12px 16px">';
+          html += '  <div class="field"><label>Name</label><input type="text" name="name" value="' + escapeHtml(d.name) + '" maxlength="40" required></div>';
+          html += '  <div class="field"><label>Type</label><select name="kind"><option value="percent"' + (d.kind !== "flat" ? ' selected' : '') + '>% of ' + basisLabel + '</option><option value="flat"' + (d.kind === "flat" ? ' selected' : '') + '>Flat $ per paycheck</option></select></div>';
+          html += '  <div class="field"><label>Value</label><input type="number" name="value" min="0" step="0.01" value="' + (Number(d.value) || 0) + '" required></div>';
+          html += '  <span class="sub-actions"><button type="button" class="mini-btn" data-action="cancel-edit-deduction">Cancel</button><button type="submit" class="mini-btn">Save</button></span>';
+          html += '</form>';
+        } else {
+          html += '<div class="sub-row">';
+          html += '  <span class="sub-name">' + escapeHtml(d.name) + '</span>';
+          html += '  <span class="sub-meta">' + (d.kind === "percent" ? (Number(d.value) || 0) + '% of ' + basisLabel : 'Flat amount') + '</span>';
+          html += '  <span class="sub-amount" style="color:var(--status-critical)">−' + currencyPrecise.format(d.amount) + '</span>';
+          html += '  <span class="sub-actions"><button class="mini-btn" data-action="edit-deduction" data-id="' + d.id + '">Edit</button><button class="mini-btn danger" data-action="remove-deduction" data-id="' + d.id + '">Remove</button></span>';
+          html += '</div>';
+        }
+      });
+      html += '</div>';
+    }
+    html += '  <form class="sub-add-form" data-action="add-deduction" data-category="' + kind + '">';
+    html += '    <div class="field"><label>Name</label><input type="text" name="name" placeholder="' + (isPretax ? "e.g. 401k, HSA" : "e.g. Federal Tax, FICA") + '" maxlength="40" required></div>';
+    html += '    <div class="field"><label>Type</label><select name="kind"><option value="percent">% of ' + basisLabel + '</option><option value="flat">Flat $ per paycheck</option></select></div>';
+    html += '    <div class="field"><label>Value</label><input type="number" name="value" min="0" step="0.01" placeholder="0.00" required></div>';
+    html += '    <button type="submit" class="submit-btn neutral">+ Add deduction</button>';
+    html += '  </form>';
+    html += '  </div>';
+    html += '</section>';
+    return html;
+  }
+
+  function renderSalaryBreakdownChart(calc){
+    if(calc.gross <= 0) return "";
+    var segments = [
+      { label: "Net pay", amount: Math.max(0, calc.net), color: "var(--chart-salary-net)" },
+      { label: "Pretax deductions", amount: Math.max(0, calc.pretaxTotal), color: "var(--chart-salary-pretax)" },
+      { label: "Tax deductions", amount: Math.max(0, calc.taxTotal), color: "var(--chart-salary-tax)" }
+    ];
+
+    var W = 600, H = 36, R = 8, gap = 3;
+    var usableW = W - gap * (segments.length - 1);
+    var x = 0;
+    var rects = "";
+    segments.forEach(function(seg){
+      var pct = calc.gross > 0 ? seg.amount / calc.gross : 0;
+      var w = Math.max(0, pct * usableW);
+      if(w > 0.5){
+        rects += '<rect x="' + x.toFixed(2) + '" y="0" width="' + w.toFixed(2) + '" height="' + H + '" style="fill:' + seg.color + '"><title>' + escapeHtml(seg.label) + ': ' + currencyPrecise.format(seg.amount) + ' (' + Math.round(pct * 100) + '%)</title></rect>';
+      }
+      x += w + gap;
+    });
+
+    var svg = '<svg viewBox="0 0 ' + W + ' ' + H + '" style="width:100%;height:' + H + 'px;display:block" role="img" aria-label="Paycheck breakdown: net pay, pretax deductions, and tax deductions as a share of gross pay">';
+    svg += '<defs><clipPath id="salary-bar-clip"><rect x="0" y="0" width="' + W + '" height="' + H + '" rx="' + R + '" ry="' + R + '"/></clipPath></defs>';
+    svg += '<g clip-path="url(#salary-bar-clip)">' + rects + '</g>';
+    svg += '</svg>';
+
+    var legend = '<div style="display:flex;gap:20px;flex-wrap:wrap;margin-top:14px">';
+    segments.forEach(function(seg){
+      var pct = calc.gross > 0 ? Math.round((seg.amount / calc.gross) * 100) : 0;
+      legend += '<div style="display:flex;align-items:center;gap:7px;font-size:12.5px">';
+      legend += '<span style="width:10px;height:10px;border-radius:3px;background:' + seg.color + ';flex:none"></span>';
+      legend += '<span style="color:var(--text-secondary)">' + escapeHtml(seg.label) + '</span>';
+      legend += '<b style="color:var(--text-primary)">' + currencyPrecise.format(seg.amount) + '</b>';
+      legend += '<span style="color:var(--text-muted)">(' + pct + '%)</span>';
+      legend += '</div>';
+    });
+    legend += '</div>';
+
+    return '<div style="margin-bottom:16px">' + svg + legend + '</div>';
   }
 
   function renderSalaryPage(){
@@ -2475,57 +2774,39 @@
     html += '    <form class="entry-form" data-action="save-salary" style="margin:0">';
     html += '      <div class="field"><label>Annual gross salary</label><input type="number" name="annualSalary" min="0" step="0.01" value="' + (s.annualSalary || "") + '" placeholder="0.00"></div>';
     html += '      <div class="field"><label>Pay frequency</label><select name="payFrequency">' + PAY_FREQUENCIES.map(function(f){ return '<option value="' + f.id + '"' + (f.id === s.payFrequency ? ' selected' : '') + '>' + f.label + ' (' + f.periods + '/yr)</option>'; }).join("") + '</select></div>';
+    html += '      <div class="field"><label>Auto-income start date</label><input type="date" name="startDate" value="' + escapeHtml(s.startDate || "") + '"></div>';
     html += '      <button type="submit" class="submit-btn neutral">Save</button>';
     html += '    </form>';
+    html += '    <p class="section-hint" style="margin:10px 0 0">Set a start date to automatically add your net pay to Recurring income on each payday — no manual logging needed. Clear the date to pause.</p>';
     html += '  </div>';
     html += '</section>';
 
+    html += renderDeductionSection("pretax", s, calc);
+    html += renderDeductionSection("tax", s, calc);
+
+    var syncedItem = (state.recurringIncome.personal.items || []).find(function(r){ return r.fromSalary; });
     html += '<section>';
-    html += '  <div class="section-head"><span class="section-title">➖ Deductions</span><span class="section-hint">Taxes, retirement, insurance — as a percent of gross or a flat amount per paycheck</span></div>';
-    html += '  <div class="card">';
-    var deds = s.deductions || [];
-    if(deds.length === 0){
-      html += '<div class="sub-empty">No deductions added yet — your net pay equals gross until you add some.</div>';
-    } else {
-      html += '<div class="sub-list">';
-      calc.deductions.forEach(function(d){
-        if(state.editingDeduction === d.id){
-          html += '<form class="sub-add-form" data-action="save-deduction-edit" data-id="' + d.id + '" style="padding:12px 16px">';
-          html += '  <div class="field"><label>Name</label><input type="text" name="name" value="' + escapeHtml(d.name) + '" maxlength="40" required></div>';
-          html += '  <div class="field"><label>Type</label><select name="kind"><option value="percent"' + (d.kind !== "flat" ? ' selected' : '') + '>% of gross</option><option value="flat"' + (d.kind === "flat" ? ' selected' : '') + '>Flat $ per paycheck</option></select></div>';
-          html += '  <div class="field"><label>Value</label><input type="number" name="value" min="0" step="0.01" value="' + (Number(d.value) || 0) + '" required></div>';
-          html += '  <span class="sub-actions"><button type="button" class="mini-btn" data-action="cancel-edit-deduction">Cancel</button><button type="submit" class="mini-btn">Save</button></span>';
-          html += '</form>';
-        } else {
-          html += '<div class="sub-row">';
-          html += '  <span class="sub-name">' + escapeHtml(d.name) + '</span>';
-          html += '  <span class="sub-meta">' + (d.kind === "percent" ? (Number(d.value) || 0) + '% of gross' : 'Flat amount') + '</span>';
-          html += '  <span class="sub-amount" style="color:var(--status-critical)">−' + currencyPrecise.format(d.amount) + '</span>';
-          html += '  <span class="sub-actions"><button class="mini-btn" data-action="edit-deduction" data-id="' + d.id + '">Edit</button><button class="mini-btn danger" data-action="remove-deduction" data-id="' + d.id + '">Remove</button></span>';
-          html += '</div>';
-        }
-      });
-      html += '</div>';
+    html += '  <div class="section-head"><span class="section-title">📊 Salary breakdown</span><span class="section-hint">Gross vs. net, at every timescale</span></div>';
+    if(calc.gross > 0){
+      html += '  <div class="card" style="padding:16px">' + renderSalaryBreakdownChart(calc) + '</div>';
     }
-    html += '  <form class="sub-add-form" data-action="add-deduction">';
-    html += '    <div class="field"><label>Name</label><input type="text" name="name" placeholder="e.g. Federal Tax, 401k" maxlength="40" required></div>';
-    html += '    <div class="field"><label>Type</label><select name="kind"><option value="percent">% of gross</option><option value="flat">Flat $ per paycheck</option></select></div>';
-    html += '    <div class="field"><label>Value</label><input type="number" name="value" min="0" step="0.01" placeholder="0.00" required></div>';
-    html += '    <button type="submit" class="submit-btn neutral">+ Add deduction</button>';
-    html += '  </form>';
+    html += '  <div class="stat-row" style="margin-top:12px">';
+    html += statTile("💰 Gross — Annual", currency.format(calc.gross * calc.freq.periods));
+    html += statTile("💰 Gross — Monthly", currency.format(calc.gross * calc.freq.periods / 12));
+    html += statTile("💰 Gross — Per paycheck", currencyPrecise.format(calc.gross));
     html += '  </div>';
-    html += '</section>';
-
-    html += '<section>';
-    html += '  <div class="section-head"><span class="section-title">💵 Per-paycheck breakdown</span><span class="section-hint">' + calc.freq.label + ' · ' + calc.freq.periods + '/year</span></div>';
-    html += '  <div class="stat-row">';
-    html += statTile("💰 Gross per paycheck", currencyPrecise.format(calc.gross));
-    html += statTile("➖ Total deductions", currencyPrecise.format(calc.totalDeductions));
-    html += statTile("✅ Net per paycheck", currencyPrecise.format(calc.net));
+    html += '  <div class="stat-row" style="margin-top:10px">';
+    html += statTile("✅ Net — Annual", currency.format(calc.net * calc.freq.periods));
+    html += statTile("✅ Net — Monthly", currency.format(calc.net * calc.freq.periods / 12));
+    html += statTile("✅ Net — Per paycheck", currencyPrecise.format(calc.net));
     html += '  </div>';
-    html += '  <div class="card" style="padding:14px 16px;margin-top:12px;display:flex;flex-direction:column;gap:10px">';
-    html += '    <p class="section-hint" style="margin:0">Annual: ' + currency.format(calc.gross * calc.freq.periods) + ' gross → ' + currency.format(calc.net * calc.freq.periods) + ' net. This is a simplified estimate for planning — not a substitute for a real pay stub or tax advice.</p>';
-    html += '    <div><button type="button" class="ghost-btn" data-action="add-net-as-recurring-income">➕ Add net pay as recurring income (' + (payFrequencyMeta(s.payFrequency).id === "biweekly" ? "bi-weekly" : payFrequencyMeta(s.payFrequency).label.toLowerCase()) + ')</button></div>';
+    html += '  <div class="card" style="padding:14px 16px;margin-top:12px;display:flex;flex-direction:column;gap:8px">';
+    html += '    <p class="section-hint" style="margin:0">Taxable income per paycheck: <b style="color:var(--text-primary)">' + currencyPrecise.format(calc.taxableIncome) + '</b> (after ' + currencyPrecise.format(calc.pretaxTotal) + ' in pretax deductions). This is a simplified estimate for planning — not a substitute for a real pay stub or tax advice.</p>';
+    if(syncedItem){
+      html += '    <p class="section-hint" style="margin:0;color:var(--status-good)">✅ Automatically scheduled into Recurring income — next payout ' + fmtDate(syncedItem.nextDate) + '.</p>';
+    } else {
+      html += '    <p class="section-hint" style="margin:0">Set a start date above to automatically schedule your net pay into Recurring income.</p>';
+    }
     html += '  </div>';
     html += '</section>';
     return html;
@@ -2555,7 +2836,8 @@
         var typeMeta = incomeTypeMeta(i.type || "other");
         html += '<div class="sub-row">';
         html += '  <span class="sub-name">' + escapeHtml(i.source) + '</span>';
-        html += '  <span class="sub-meta">' + typeMeta.emoji + ' ' + typeMeta.label + '</span>';
+        html += '  <span class="sub-meta">' + typeMeta.emoji + ' ' + typeMeta.label + (i.subcategory ? ' · ' + escapeHtml(i.subcategory) : '') + '</span>';
+        if(i.vendor) html += '  <span class="sub-meta">' + escapeHtml(i.vendor) + '</span>';
         html += '  <span class="sub-meta">' + fmtDate(i.date) + '</span>';
         if(i.note) html += '  <span class="sub-meta">' + escapeHtml(i.note) + '</span>';
         html += '  <span class="sub-amount" style="color:var(--status-good)">+' + currency.format(i.amount) + '</span>';
@@ -2831,6 +3113,14 @@
       removeSubcategory(removeSubcatBtn.dataset.tracker, removeSubcatBtn.dataset.category, removeSubcatBtn.dataset.sub);
       return;
     }
+    var removeCatBtn = ev.target.closest('[data-action="remove-category"]');
+    if(removeCatBtn){
+      var rcName = removeCatBtn.dataset.name;
+      if(confirm('Remove category "' + rcName + '"? Any expenses already logged under it will keep the category name, but it will no longer appear in your budget list.')){
+        removeCategory(removeCatBtn.dataset.tracker, rcName);
+      }
+      return;
+    }
     var delBtn = ev.target.closest('[data-action="delete-expense"]');
     if(delBtn){
       deleteExpense(delBtn.dataset.id);
@@ -2866,9 +3156,42 @@
       removePaymentMethod(removeCardBtn.dataset.id);
       return;
     }
-    var logSubBtn = ev.target.closest('[data-action="log-subscription"]');
-    if(logSubBtn){
-      logSubscriptionPayment(logSubBtn.dataset.tracker, logSubBtn.dataset.id);
+    var removeBankBtn = ev.target.closest('[data-action="remove-bank-account"]');
+    if(removeBankBtn){
+      removeBankAccount(removeBankBtn.dataset.id);
+      return;
+    }
+    var editSubBtn = ev.target.closest('[data-action="edit-subscription"]');
+    if(editSubBtn){
+      state.editingSubscription = { tracker: editSubBtn.dataset.tracker, id: editSubBtn.dataset.id };
+      renderPanel(state.tracker);
+      return;
+    }
+    var cancelEditSubBtn = ev.target.closest('[data-action="cancel-edit-subscription"]');
+    if(cancelEditSubBtn){
+      state.editingSubscription = null;
+      renderPanel(state.tracker);
+      return;
+    }
+    var toggleSubListBtn = ev.target.closest('[data-action="toggle-subscriptions-list"]');
+    if(toggleSubListBtn){
+      var tsl = toggleSubListBtn.dataset.tracker;
+      state.subscriptionsExpanded[tsl] = !state.subscriptionsExpanded[tsl];
+      renderPanel(state.tracker);
+      return;
+    }
+    var toggleLogFiltersBtn = ev.target.closest('[data-action="toggle-log-filters"]');
+    if(toggleLogFiltersBtn){
+      var tlf = toggleLogFiltersBtn.dataset.tracker;
+      state.logFilterExpanded[tlf] = !state.logFilterExpanded[tlf];
+      renderPanel(state.tracker);
+      return;
+    }
+    var clearLogFiltersBtn = ev.target.closest('[data-action="clear-log-filters"]');
+    if(clearLogFiltersBtn){
+      var tclf = clearLogFiltersBtn.dataset.tracker;
+      state.logFilter[tclf] = { q: "", category: "", subcategory: "", type: "", txType: "", dateFrom: "", dateTo: "", amountMin: "", amountMax: "" };
+      renderPanel(state.tracker);
       return;
     }
     var removeSubBtn = ev.target.closest('[data-action="remove-subscription"]');
@@ -2886,9 +3209,23 @@
       removeIncomeType(removeIncomeTypeBtn.dataset.id);
       return;
     }
-    var logRecIncBtn = ev.target.closest('[data-action="log-recurring-income"]');
-    if(logRecIncBtn){
-      logRecurringIncomePayment(logRecIncBtn.dataset.tracker, logRecIncBtn.dataset.id);
+    var editRecIncBtn = ev.target.closest('[data-action="edit-recurring-income"]');
+    if(editRecIncBtn){
+      state.editingRecurringIncome = { tracker: editRecIncBtn.dataset.tracker, id: editRecIncBtn.dataset.id };
+      renderPanel(state.tracker);
+      return;
+    }
+    var cancelEditRecIncBtn = ev.target.closest('[data-action="cancel-edit-recurring-income"]');
+    if(cancelEditRecIncBtn){
+      state.editingRecurringIncome = null;
+      renderPanel(state.tracker);
+      return;
+    }
+    var toggleRecIncListBtn = ev.target.closest('[data-action="toggle-recurring-income-list"]');
+    if(toggleRecIncListBtn){
+      var tril = toggleRecIncListBtn.dataset.tracker;
+      state.recurringIncomeExpanded[tril] = !state.recurringIncomeExpanded[tril];
+      renderPanel(state.tracker);
       return;
     }
     var removeRecIncBtn = ev.target.closest('[data-action="remove-recurring-income"]');
@@ -2896,24 +3233,10 @@
       removeRecurringIncome(removeRecIncBtn.dataset.tracker, removeRecIncBtn.dataset.id);
       return;
     }
-    var addNetIncomeBtn = ev.target.closest('[data-action="add-net-as-recurring-income"]');
-    if(addNetIncomeBtn){
-      var calc0 = computePaycheck();
-      addRecurringIncome("personal", {
-        source: "Salary (net)",
-        type: "salary",
-        amount: Math.round(calc0.net * 100) / 100,
-        frequency: state.salarySetup.payFrequency,
-        nextDate: todayStr()
-      });
-      state.page = "manage";
-      render();
-      return;
-    }
     var removeDedBtn = ev.target.closest('[data-action="remove-deduction"]');
     if(removeDedBtn){
       var newDeductions = (state.salarySetup.deductions || []).filter(function(d){ return d.id !== removeDedBtn.dataset.id; });
-      saveSalarySetup({ annualSalary: state.salarySetup.annualSalary, payFrequency: state.salarySetup.payFrequency, deductions: newDeductions });
+      saveSalarySetup(salarySetupWith({ deductions: newDeductions }));
       return;
     }
     var editDedBtn = ev.target.closest('[data-action="edit-deduction"]');
@@ -3038,10 +3361,19 @@
       var form = ev.target.closest("form");
       var cardField = form && form.querySelector('[data-role="card-field"]');
       if(!cardField) return;
-      var needsCard = paymentTypeMeta(ev.target.value).needsCard;
-      cardField.style.display = needsCard ? "" : "none";
+      var ptMeta = paymentTypeMeta(ev.target.value);
+      var needsAccount = ptMeta.needsAccount;
+      var kind = ptMeta.accountKind || "card";
+      cardField.style.display = needsAccount ? "" : "none";
+      var labelEl = cardField.querySelector('[data-role="card-field-label"]');
+      if(labelEl) labelEl.textContent = kind === "bank" ? "Bank account" : "Card";
       var sel = cardField.querySelector("select");
-      if(sel){ sel.required = needsCard; if(!needsCard) sel.value = ""; }
+      if(sel){
+        sel.required = needsAccount;
+        var placeholder = kind === "bank" ? "Choose a bank account…" : "Choose a card…";
+        sel.innerHTML = '<option value="">' + placeholder + '</option>' + accountSelectOptions(kind, "");
+        if(!needsAccount) sel.value = "";
+      }
       return;
     }
     if(ev.target.name === "category" && ev.target.closest('[data-action="add-expense"]')){
@@ -3054,6 +3386,18 @@
       var editExpForm = ev.target.closest('[data-action="save-edit-expense"]');
       var editSubSel = editExpForm.querySelector('[data-role="edit-subcat-select"]');
       if(editSubSel) editSubSel.innerHTML = subcategoryOptionsHtml(editExpForm.dataset.tracker, ev.target.value, "");
+      return;
+    }
+    if(ev.target.matches('[data-role="sub-cat-select"]')){
+      var subAddForm = ev.target.closest('[data-action="add-subscription"]');
+      var subAddSubSel = subAddForm && subAddForm.querySelector('[data-role="sub-subcat-select"]');
+      if(subAddSubSel) subAddSubSel.innerHTML = subcategoryOptionsHtml(subAddForm.dataset.tracker, ev.target.value, "");
+      return;
+    }
+    if(ev.target.matches('[data-role="sub-edit-cat-select"]')){
+      var subEditFormEl = ev.target.closest('[data-action="save-subscription-edit"]');
+      var subEditSubSel = subEditFormEl && subEditFormEl.querySelector('[data-role="sub-edit-subcat-select"]');
+      if(subEditSubSel) subEditSubSel.innerHTML = subcategoryOptionsHtml(subEditFormEl.dataset.tracker, ev.target.value, "");
       return;
     }
     if(ev.target.matches('[data-role="import-row-toggle"]')){
@@ -3077,9 +3421,22 @@
       return;
     }
     var catMatch = ev.target.id.match(/^log-filter-cat-(personal|wedding)$/);
-    if(catMatch){ state.logFilter[catMatch[1]].category = ev.target.value; updateLogTable(catMatch[1]); return; }
+    if(catMatch){
+      state.logFilter[catMatch[1]].category = ev.target.value;
+      state.logFilter[catMatch[1]].subcategory = "";
+      renderPanel(state.tracker);
+      return;
+    }
     var typeMatch = ev.target.id.match(/^log-filter-type-(personal|wedding)$/);
     if(typeMatch){ state.logFilter[typeMatch[1]].type = ev.target.value; updateLogTable(typeMatch[1]); return; }
+    var subcatFilterMatch = ev.target.id.match(/^log-filter-subcat-(personal|wedding)$/);
+    if(subcatFilterMatch){ state.logFilter[subcatFilterMatch[1]].subcategory = ev.target.value; updateLogTable(subcatFilterMatch[1]); return; }
+    var txTypeMatch = ev.target.id.match(/^log-filter-txtype-(personal|wedding)$/);
+    if(txTypeMatch){ state.logFilter[txTypeMatch[1]].txType = ev.target.value; updateLogTable(txTypeMatch[1]); return; }
+    var dateFromMatch = ev.target.id.match(/^log-filter-datefrom-(personal|wedding)$/);
+    if(dateFromMatch){ state.logFilter[dateFromMatch[1]].dateFrom = ev.target.value; updateLogTable(dateFromMatch[1]); return; }
+    var dateToMatch = ev.target.id.match(/^log-filter-dateto-(personal|wedding)$/);
+    if(dateToMatch){ state.logFilter[dateToMatch[1]].dateTo = ev.target.value; updateLogTable(dateToMatch[1]); return; }
   });
 
   document.addEventListener("input", function(ev){
@@ -3089,6 +3446,23 @@
       state.logFilter[tr2].q = ev.target.value;
       clearTimeout(state.logFilter[tr2]._t);
       state.logFilter[tr2]._t = setTimeout(function(){ updateLogTable(tr2); }, 120);
+      return;
+    }
+    var amountMinMatch = ev.target.id.match(/^log-filter-amountmin-(personal|wedding)$/);
+    if(amountMinMatch){
+      var trMin = amountMinMatch[1];
+      state.logFilter[trMin].amountMin = ev.target.value;
+      clearTimeout(state.logFilter[trMin]._tMin);
+      state.logFilter[trMin]._tMin = setTimeout(function(){ updateLogTable(trMin); }, 200);
+      return;
+    }
+    var amountMaxMatch = ev.target.id.match(/^log-filter-amountmax-(personal|wedding)$/);
+    if(amountMaxMatch){
+      var trMax = amountMaxMatch[1];
+      state.logFilter[trMax].amountMax = ev.target.value;
+      clearTimeout(state.logFilter[trMax]._tMax);
+      state.logFilter[trMax]._tMax = setTimeout(function(){ updateLogTable(trMax); }, 200);
+      return;
     }
   });
 
@@ -3180,6 +3554,17 @@
       cardForm.reset();
       return;
     }
+    var bankForm = ev.target.closest('[data-action="add-bank-account"]');
+    if(bankForm){
+      ev.preventDefault();
+      var bd = new FormData(bankForm);
+      var bankName = (bd.get("name") || "").toString().trim().slice(0, 40);
+      if(!bankName) return;
+      var bankLast4 = (bd.get("last4") || "").toString().replace(/[^0-9]/g, "").slice(0, 4);
+      addBankAccount(bankName, bankLast4);
+      bankForm.reset();
+      return;
+    }
     var catForm = ev.target.closest('[data-action="add-category-inline"]');
     if(catForm){
       ev.preventDefault();
@@ -3214,12 +3599,37 @@
         amount: sAmount,
         cycle: sd.get("cycle") === "yearly" ? "yearly" : "monthly",
         category: sd.get("category") || "Other",
+        subcategory: (sd.get("subcategory") || "").toString().trim().slice(0, 30) || null,
         vendor: (sd.get("vendor") || "").toString().trim().slice(0, 60) || null,
         paymentType: sd.get("subType") || "cash",
         cardId: sd.get("subCard") || null,
-        nextDate: sd.get("nextDate") || todayStr()
+        nextDate: sd.get("nextDate") || todayStr(),
+        note: (sd.get("note") || "").toString().trim().slice(0, 200) || null
       });
       subForm.reset();
+      return;
+    }
+    var subEditForm = ev.target.closest('[data-action="save-subscription-edit"]');
+    if(subEditForm){
+      ev.preventDefault();
+      var setr = subEditForm.dataset.tracker;
+      var seid = subEditForm.dataset.id;
+      var sed = new FormData(subEditForm);
+      var seAmount = parseFloat(sed.get("amount"));
+      var seName = (sed.get("name") || "").toString().trim().slice(0, 40);
+      if(!seName || !seAmount || seAmount <= 0) return;
+      updateSubscription(setr, seid, {
+        name: seName,
+        amount: seAmount,
+        cycle: sed.get("cycle") === "yearly" ? "yearly" : "monthly",
+        category: sed.get("category") || "Other",
+        subcategory: (sed.get("subcategory") || "").toString().trim().slice(0, 30) || null,
+        vendor: (sed.get("vendor") || "").toString().trim().slice(0, 60) || null,
+        paymentType: sed.get("subEditType") || "cash",
+        cardId: sed.get("subEditCard") || null,
+        nextDate: sed.get("nextDate") || todayStr(),
+        note: (sed.get("note") || "").toString().trim().slice(0, 200) || null
+      });
       return;
     }
     var incomeForm = ev.target.closest('[data-action="add-income"]');
@@ -3253,11 +3663,35 @@
       addRecurringIncome(ritr, {
         source: rSource,
         type: rdata.get("incomeType") || "other",
+        subcategory: (rdata.get("subcategory") || "").toString().trim().slice(0, 40) || null,
         amount: rAmount,
         frequency: rdata.get("frequency") || "monthly",
-        nextDate: rdata.get("nextDate") || todayStr()
+        vendor: (rdata.get("vendor") || "").toString().trim().slice(0, 60) || null,
+        nextDate: rdata.get("nextDate") || todayStr(),
+        note: (rdata.get("note") || "").toString().trim().slice(0, 200) || null
       });
       recIncForm.reset();
+      return;
+    }
+    var recIncEditForm = ev.target.closest('[data-action="save-recurring-income-edit"]');
+    if(recIncEditForm){
+      ev.preventDefault();
+      var rietr = recIncEditForm.dataset.tracker;
+      var rieid = recIncEditForm.dataset.id;
+      var ried = new FormData(recIncEditForm);
+      var rieAmount = parseFloat(ried.get("amount"));
+      var rieSource = (ried.get("source") || "").toString().trim().slice(0, 60);
+      if(!rieSource || !rieAmount || rieAmount <= 0) return;
+      updateRecurringIncome(rietr, rieid, {
+        source: rieSource,
+        type: ried.get("incomeType") || "other",
+        subcategory: (ried.get("subcategory") || "").toString().trim().slice(0, 40) || null,
+        amount: rieAmount,
+        frequency: ried.get("frequency") || "monthly",
+        vendor: (ried.get("vendor") || "").toString().trim().slice(0, 60) || null,
+        nextDate: ried.get("nextDate") || todayStr(),
+        note: (ried.get("note") || "").toString().trim().slice(0, 200) || null
+      });
       return;
     }
     var salaryForm = ev.target.closest('[data-action="save-salary"]');
@@ -3265,11 +3699,11 @@
       ev.preventDefault();
       var sad = new FormData(salaryForm);
       var annual = parseFloat(sad.get("annualSalary"));
-      saveSalarySetup({
+      saveSalarySetup(salarySetupWith({
         annualSalary: isNaN(annual) ? 0 : annual,
         payFrequency: sad.get("payFrequency") || "biweekly",
-        deductions: state.salarySetup.deductions || []
-      });
+        startDate: sad.get("startDate") || null
+      }));
       return;
     }
     var dedForm = ev.target.closest('[data-action="add-deduction"]');
@@ -3279,8 +3713,9 @@
       var dName = (dd.get("name") || "").toString().trim().slice(0, 40);
       var dValue = parseFloat(dd.get("value"));
       if(!dName || isNaN(dValue) || dValue < 0) return;
-      var deductions = (state.salarySetup.deductions || []).concat([{ id: uid("ded"), name: dName, kind: dd.get("kind") === "flat" ? "flat" : "percent", value: dValue }]);
-      saveSalarySetup({ annualSalary: state.salarySetup.annualSalary, payFrequency: state.salarySetup.payFrequency, deductions: deductions });
+      var dCategory = dedForm.dataset.category === "pretax" ? "pretax" : "tax";
+      var deductions = (state.salarySetup.deductions || []).concat([{ id: uid("ded"), name: dName, kind: dd.get("kind") === "flat" ? "flat" : "percent", value: dValue, category: dCategory }]);
+      saveSalarySetup(salarySetupWith({ deductions: deductions }));
       dedForm.reset();
       return;
     }
@@ -3294,10 +3729,10 @@
       if(!edName || isNaN(edValue) || edValue < 0) return;
       var updatedDeductions = (state.salarySetup.deductions || []).map(function(d){
         if(d.id !== dedId) return d;
-        return { id: d.id, name: edName, kind: ded.get("kind") === "flat" ? "flat" : "percent", value: edValue };
+        return { id: d.id, name: edName, kind: ded.get("kind") === "flat" ? "flat" : "percent", value: edValue, category: d.category };
       });
       state.editingDeduction = null;
-      saveSalarySetup({ annualSalary: state.salarySetup.annualSalary, payFrequency: state.salarySetup.payFrequency, deductions: updatedDeductions });
+      saveSalarySetup(salarySetupWith({ deductions: updatedDeductions }));
       return;
     }
     var vendorForm = ev.target.closest('[data-action="add-vendor"]');
@@ -3348,6 +3783,16 @@
     if(exists) return;
     var categories = (doc.categories || []).concat([{ name: name, budget: 0, subcategories: [] }]);
     recordChange(tracker, "Added category \"" + name + "\"");
+    saveBudget(tracker, categories, doc.hint);
+  }
+
+  function removeCategory(tracker, name){
+    var doc = state.budgets[tracker] || { categories: [] };
+    var categories = (doc.categories || []).filter(function(c){ return c.name !== name; });
+    if(state.expandedCategory && state.expandedCategory.tracker === tracker && state.expandedCategory.name === name) state.expandedCategory = null;
+    if(state.editingCategory && state.editingCategory.tracker === tracker && state.editingCategory.name === name) state.editingCategory = null;
+    if(state.detailCategory === name && state.tracker === tracker && state.page === "detail"){ state.page = "manage"; state.detailCategory = null; }
+    recordChange(tracker, "Removed category \"" + name + "\"");
     saveBudget(tracker, categories, doc.hint);
   }
 
@@ -3607,6 +4052,21 @@
     savePaymentMethods();
   }
 
+  function saveBankAccounts(){
+    render();
+    schedulePersist();
+  }
+
+  function addBankAccount(name, last4){
+    state.bankAccounts.items = (state.bankAccounts.items || []).concat([{ id: uid("bank"), name: name, last4: last4 || "" }]);
+    saveBankAccounts();
+  }
+
+  function removeBankAccount(id){
+    state.bankAccounts.items = (state.bankAccounts.items || []).filter(function(p){ return p.id !== id; });
+    saveBankAccounts();
+  }
+
   function saveSubscriptions(tracker){
     render();
     schedulePersist();
@@ -3617,32 +4077,43 @@
     state.subscriptions[tracker].items = (state.subscriptions[tracker].items || []).concat([sub]);
     recordChange(tracker, "Added subscription \"" + sub.name + "\"");
     saveSubscriptions(tracker);
+    processDueRecurring();
   }
 
   function removeSubscription(tracker, id){
     var removed = (state.subscriptions[tracker].items || []).find(function(s){ return s.id === id; });
     state.subscriptions[tracker].items = (state.subscriptions[tracker].items || []).filter(function(s){ return s.id !== id; });
     if(removed) recordChange(tracker, "Removed subscription \"" + removed.name + "\"");
+    if(state.editingSubscription && state.editingSubscription.tracker === tracker && state.editingSubscription.id === id) state.editingSubscription = null;
     saveSubscriptions(tracker);
   }
 
-  function logSubscriptionPayment(tracker, id){
+  function updateSubscription(tracker, id, changes){
     var items = state.subscriptions[tracker].items || [];
     var sub = items.find(function(s){ return s.id === id; });
     if(!sub) return;
+    Object.assign(sub, changes);
+    recordChange(tracker, "Edited subscription \"" + sub.name + "\"");
+    state.editingSubscription = null;
+    saveSubscriptions(tracker);
+    processDueRecurring();
+  }
+
+  function applySubscriptionCharge(tracker, sub){
     addExpense({
       tracker: tracker,
       category: sub.category || "Other",
+      subcategory: sub.subcategory || null,
       vendor: sub.vendor || null,
       amount: Number(sub.amount) || 0,
-      date: todayStr(),
-      note: "Subscription: " + sub.name,
+      date: sub.nextDate,
+      note: sub.note || ("Subscription: " + sub.name),
       paymentType: sub.paymentType || "cash",
       cardId: sub.cardId || null,
+      subscriptionId: sub.id,
       createdAt: new Date().toISOString()
     });
     sub.nextDate = addToDate(sub.nextDate, sub.cycle);
-    saveSubscriptions(tracker);
   }
 
   function saveIncome(tracker){
@@ -3695,26 +4166,118 @@
     item.id = uid("rinc");
     state.recurringIncome[tracker].items = (state.recurringIncome[tracker].items || []).concat([item]);
     saveRecurringIncome(tracker);
+    processDueRecurring();
   }
 
   function removeRecurringIncome(tracker, id){
     state.recurringIncome[tracker].items = (state.recurringIncome[tracker].items || []).filter(function(r){ return r.id !== id; });
+    if(state.editingRecurringIncome && state.editingRecurringIncome.tracker === tracker && state.editingRecurringIncome.id === id) state.editingRecurringIncome = null;
     saveRecurringIncome(tracker);
   }
 
-  function logRecurringIncomePayment(tracker, id){
+  function updateRecurringIncome(tracker, id, changes){
     var items = state.recurringIncome[tracker].items || [];
     var r = items.find(function(x){ return x.id === id; });
     if(!r) return;
-    addIncome(tracker, { source: r.source, type: r.type || "other", amount: Number(r.amount) || 0, date: todayStr(), note: "" });
-    r.nextDate = addToDate(r.nextDate, r.frequency);
+    Object.assign(r, changes);
+    state.editingRecurringIncome = null;
     saveRecurringIncome(tracker);
+    processDueRecurring();
+  }
+
+  function applyRecurringIncomeEntry(tracker, r){
+    addIncome(tracker, {
+      source: r.source,
+      type: r.type || "other",
+      subcategory: r.subcategory || null,
+      vendor: r.vendor || null,
+      amount: Number(r.amount) || 0,
+      date: r.nextDate,
+      note: r.note || ""
+    });
+    r.nextDate = addToDate(r.nextDate, r.frequency);
+  }
+
+  function processDueRecurring(){
+    var today = todayStr();
+    var trackers = ["personal", "wedding"];
+    var appliedAny = false;
+    trackers.forEach(function(tracker){
+      var subs = (state.subscriptions[tracker] && state.subscriptions[tracker].items) || [];
+      subs.forEach(function(sub){
+        var guard = 0;
+        while(sub.nextDate && sub.nextDate <= today && guard < 24){
+          applySubscriptionCharge(tracker, sub);
+          appliedAny = true;
+          guard++;
+        }
+      });
+      var rincs = (state.recurringIncome[tracker] && state.recurringIncome[tracker].items) || [];
+      rincs.forEach(function(r){
+        var guard = 0;
+        while(r.nextDate && r.nextDate <= today && guard < 24){
+          applyRecurringIncomeEntry(tracker, r);
+          appliedAny = true;
+          guard++;
+        }
+      });
+    });
+    if(appliedAny){
+      render();
+      schedulePersist();
+    }
+    return appliedAny;
+  }
+
+  function salarySetupWith(overrides){
+    return Object.assign({}, state.salarySetup, overrides);
   }
 
   function saveSalarySetup(setup){
     state.salarySetup = setup;
+    syncSalaryRecurringIncome();
     render();
     schedulePersist();
+  }
+
+  function syncSalaryRecurringIncome(){
+    var s = state.salarySetup;
+    var items = state.recurringIncome.personal.items || [];
+    var existing = items.find(function(r){ return r.fromSalary; });
+    var active = (Number(s.annualSalary) || 0) > 0 && !!s.startDate;
+
+    if(!active){
+      if(existing){
+        state.recurringIncome.personal.items = items.filter(function(r){ return r !== existing; });
+      }
+      return;
+    }
+
+    var calc = computePaycheck();
+    var netAmt = Math.round(calc.net * 100) / 100;
+
+    if(existing){
+      existing.amount = netAmt;
+      existing.frequency = s.payFrequency;
+      existing.source = "Salary (net)";
+      existing.type = "salary";
+      if(existing.startDate !== s.startDate){
+        existing.nextDate = s.startDate;
+        existing.startDate = s.startDate;
+      }
+    } else {
+      state.recurringIncome.personal.items = items.concat([{
+        id: uid("rinc"),
+        source: "Salary (net)",
+        type: "salary",
+        amount: netAmt,
+        frequency: s.payFrequency,
+        nextDate: s.startDate,
+        startDate: s.startDate,
+        fromSalary: true
+      }]);
+    }
+    processDueRecurring();
   }
 
   function payFrequencyMeta(id){
@@ -3725,13 +4288,29 @@
     var s = state.salarySetup;
     var freq = payFrequencyMeta(s.payFrequency);
     var gross = (Number(s.annualSalary) || 0) / freq.periods;
-    var deductions = (s.deductions || []).map(function(d){
+    var all = s.deductions || [];
+
+    var pretaxDeductions = all.filter(function(d){ return d.category === "pretax"; }).map(function(d){
       var amt = d.kind === "percent" ? gross * (Number(d.value) || 0) / 100 : (Number(d.value) || 0);
-      return { id: d.id, name: d.name, kind: d.kind, value: d.value, amount: amt };
+      return { id: d.id, name: d.name, kind: d.kind, value: d.value, category: "pretax", amount: amt };
     });
-    var totalDeductions = deductions.reduce(function(sum, d){ return sum + d.amount; }, 0);
-    var net = gross - totalDeductions;
-    return { freq: freq, gross: gross, deductions: deductions, totalDeductions: totalDeductions, net: net };
+    var pretaxTotal = pretaxDeductions.reduce(function(sum, d){ return sum + d.amount; }, 0);
+    var taxableIncome = gross - pretaxTotal;
+
+    var taxDeductions = all.filter(function(d){ return d.category !== "pretax"; }).map(function(d){
+      var amt = d.kind === "percent" ? taxableIncome * (Number(d.value) || 0) / 100 : (Number(d.value) || 0);
+      return { id: d.id, name: d.name, kind: d.kind, value: d.value, category: "tax", amount: amt };
+    });
+    var taxTotal = taxDeductions.reduce(function(sum, d){ return sum + d.amount; }, 0);
+    var net = taxableIncome - taxTotal;
+
+    return {
+      freq: freq, gross: gross,
+      pretaxDeductions: pretaxDeductions, pretaxTotal: pretaxTotal, taxableIncome: taxableIncome,
+      taxDeductions: taxDeductions, taxTotal: taxTotal,
+      totalDeductions: pretaxTotal + taxTotal, net: net,
+      deductions: pretaxDeductions.concat(taxDeductions)
+    };
   }
 
   function saveVendors(){
@@ -3796,6 +4375,7 @@
       budgets: state.budgets,
       expenses: state.expenses,
       paymentMethods: state.paymentMethods,
+      bankAccounts: state.bankAccounts,
       subscriptions: state.subscriptions,
       income: state.income,
       incomeTypes: state.incomeTypes,
@@ -3852,6 +4432,9 @@
     }
     if(data.paymentMethods){
       state.paymentMethods = data.paymentMethods;
+    }
+    if(data.bankAccounts){
+      state.bankAccounts = data.bankAccounts;
     }
     if(data.subscriptions){
       trackers.forEach(function(t){ if(data.subscriptions[t]) state.subscriptions[t] = data.subscriptions[t]; });
@@ -4082,6 +4665,9 @@
     state.paymentMethods = data.paymentMethods || { items: [] };
     if(!state.paymentMethods.items) state.paymentMethods.items = [];
 
+    state.bankAccounts = data.bankAccounts || { items: [] };
+    if(!state.bankAccounts.items) state.bankAccounts.items = [];
+
     state.subscriptions = data.subscriptions || { personal: { items: [] }, wedding: { items: [] } };
     trackers.forEach(function(t){
       if(!state.subscriptions[t]) state.subscriptions[t] = { items: [] };
@@ -4103,7 +4689,7 @@
       if(!state.recurringIncome[t].items) state.recurringIncome[t].items = [];
     });
 
-    state.salarySetup = data.salarySetup || { annualSalary: 0, payFrequency: "biweekly", deductions: [] };
+    state.salarySetup = data.salarySetup || { annualSalary: 0, payFrequency: "biweekly", deductions: [], startDate: null };
 
     state.vendors = data.vendors || { wedding: { items: [] } };
     if(!state.vendors.wedding) state.vendors.wedding = { items: [] };
@@ -4114,6 +4700,8 @@
     if(!state.savingsGoals.items) state.savingsGoals.items = [];
 
     state.changeLog = Array.isArray(data.changeLog) ? data.changeLog.slice(0, 20) : [];
+
+    processDueRecurring();
   }
 
   function loadFromDrive(){
@@ -4441,18 +5029,20 @@
     if(state.budgets.personal && state.budgets.personal.categories){
       var totals = categoryTotals("personal", state.personalMonth);
       state.budgets.personal.categories.forEach(function(cat){
-        if(totals[cat.name] && totals[cat.name] > cat.budget){
-          personal.push({ name: cat.name, spent: totals[cat.name], budget: cat.budget });
+        var t = totals.find(function(x){ return x.name === cat.name; });
+        if(t && t.spent > cat.budget){
+          personal.push({ name: cat.name, spent: t.spent, budget: cat.budget });
         }
       });
     }
-    
+
     var weddingMonth = monthKeyFor("wedding");
     if(state.budgets.wedding && state.budgets.wedding.categories){
       var weddingTotals = categoryTotals("wedding", weddingMonth);
       state.budgets.wedding.categories.forEach(function(cat){
-        if(weddingTotals[cat.name] && weddingTotals[cat.name] > cat.budget){
-          wedding.push({ name: cat.name, spent: weddingTotals[cat.name], budget: cat.budget });
+        var wt = weddingTotals.find(function(x){ return x.name === cat.name; });
+        if(wt && wt.spent > cat.budget){
+          wedding.push({ name: cat.name, spent: wt.spent, budget: cat.budget });
         }
       });
     }
