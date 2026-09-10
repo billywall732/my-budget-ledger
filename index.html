@@ -907,8 +907,9 @@
     gap: 10px;
     padding: 16px;
   }
-  form.entry-form .field{ flex: 1 1 120px; min-width: 0; }
-  form.entry-form .field.note-field{ flex: 1 1 160px; }
+  form.entry-form .field{ flex: 1 1 150px; min-width: 150px; }
+  form.entry-form .field.note-field{ flex: 1 1 200px; min-width: 160px; }
+  .field:has(input[name="vendor"]){ flex-grow: 2; min-width: 180px; }
   .field label{
     display: block;
     font-size: 11.5px;
@@ -934,6 +935,7 @@
     font-weight: 600;
     font-size: 14px;
     color: #fff;
+    background: var(--text-primary);
     border: none;
     border-radius: 7px;
     padding: 9px 16px;
@@ -1016,7 +1018,7 @@
   .mini-btn:hover{ color: var(--text-primary); background: var(--surface-2); }
   .mini-btn.danger:hover{ color: var(--status-critical); }
   .sub-add-form{ display: flex; flex-wrap: wrap; gap: 8px; padding: 14px 16px; align-items: end; }
-  .sub-add-form .field{ flex: 1 1 120px; }
+  .sub-add-form .field{ flex: 1 1 150px; min-width: 150px; }
   .sub-empty{ padding: 16px; color: var(--text-muted); font-size: 13.5px; }
 
   /* Trend chart */
@@ -1158,7 +1160,7 @@
   }
   .modal-close:hover{ color: var(--text-primary); }
   .modal-row{ display: flex; gap: 10px; flex-wrap: wrap; }
-  .modal-row .field{ flex: 1 1 140px; min-width: 0; }
+  .modal-row .field{ flex: 1 1 150px; min-width: 150px; }
   .modal-actions{ display: flex; justify-content: flex-end; gap: 10px; margin-top: 4px; }
 
   .table-scroll{ overflow-x: auto; }
@@ -1237,6 +1239,13 @@
     .ptype-row{ grid-template-columns: repeat(2, 1fr); }
     .stat-tile{ padding: 12px 10px; }
     .stat-value{ font-size: 18px; }
+    /* iOS Safari zooms the page in on focus of any input/select under 16px;
+       force 16px here so tapping a form field doesn't trigger that jump. */
+    input, select, textarea{ font-size: 16px !important; }
+    .icon-btn{ width: 40px; height: 40px; }
+    .month-switch button{ width: 28px; height: 28px; }
+    .mini-btn{ padding: 6px 10px; }
+    .row-edit, .row-delete{ padding: 8px; }
   }
 </style>
 </head>
@@ -2155,6 +2164,8 @@
     html += '  </div>';
     html += '</section>';
 
+    html += renderMonthlyBreakdownSection(tracker, monthKey, totals);
+
     html += renderCashFlowSection(tracker, monthKey);
     html += renderCashFlowTrendChart(tracker);
 
@@ -2223,6 +2234,97 @@
       }catch(e){ console.log("YoY error", e); }
     }
 
+    return html;
+  }
+
+  function buildBreakdownSegments(items, otherLabel, otherColor){
+    var nonzero = items.filter(function(it){ return it.amount > 0; }).slice().sort(function(a, b){ return b.amount - a.amount; });
+    if(nonzero.length <= 8) return nonzero;
+    var head = nonzero.slice(0, 7);
+    var otherTotal = nonzero.slice(7).reduce(function(s, it){ return s + it.amount; }, 0);
+    head.push({ label: otherLabel, amount: otherTotal, color: otherColor });
+    return head;
+  }
+
+  function renderShareBar(segments, clipId, ariaLabel){
+    var total = segments.reduce(function(s, seg){ return s + seg.amount; }, 0);
+    var W = 600, H = 30, R = 8, gap = 2;
+    var usableW = W - gap * Math.max(0, segments.length - 1);
+    var x = 0;
+    var rects = "";
+    segments.forEach(function(seg){
+      var pct = total > 0 ? seg.amount / total : 0;
+      var w = Math.max(0, pct * usableW);
+      if(w > 0.5){
+        rects += '<rect x="' + x.toFixed(2) + '" y="0" width="' + w.toFixed(2) + '" height="' + H + '" style="fill:' + seg.color + '"><title>' + escapeHtml(seg.label) + ': ' + currency.format(seg.amount) + ' (' + Math.round(pct * 100) + '%)</title></rect>';
+      }
+      x += w + gap;
+    });
+    var svg = '<svg viewBox="0 0 ' + W + ' ' + H + '" style="width:100%;height:' + H + 'px;display:block" role="img" aria-label="' + escapeHtml(ariaLabel) + '">';
+    svg += '<defs><clipPath id="' + clipId + '"><rect x="0" y="0" width="' + W + '" height="' + H + '" rx="' + R + '" ry="' + R + '"/></clipPath></defs>';
+    svg += '<g clip-path="url(#' + clipId + ')">' + rects + '</g>';
+    svg += '</svg>';
+
+    var legend = '<div style="display:flex;flex-direction:column;gap:9px;margin-top:14px">';
+    segments.forEach(function(seg){
+      var pct = total > 0 ? Math.round((seg.amount / total) * 100) : 0;
+      legend += '<div style="display:flex;align-items:center;gap:8px;font-size:12.5px">';
+      legend += '<span style="width:10px;height:10px;border-radius:3px;background:' + seg.color + ';flex:none"></span>';
+      legend += '<span style="color:var(--text-primary);flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">' + escapeHtml(seg.label) + '</span>';
+      legend += '<b style="font-family:\'IBM Plex Mono\',monospace;font-weight:500;color:var(--text-primary);white-space:nowrap">' + currency.format(seg.amount) + '</b>';
+      legend += '<span style="color:var(--text-muted);width:34px;text-align:right;flex:none">' + pct + '%</span>';
+      legend += '</div>';
+    });
+    legend += '</div>';
+    return svg + legend;
+  }
+
+  function renderMonthlyBreakdownSection(tracker, monthKey, totals){
+    var periodLabel = monthKey ? monthLabel(monthKey) : "all time";
+
+    var expenseItems = [];
+    totals.forEach(function(c, i){
+      if(c.spent > 0) expenseItems.push({ label: c.name, amount: c.spent, color: "var(" + seriesVarFor(i) + ")" });
+    });
+    var expenseSegments = buildBreakdownSegments(expenseItems, "Other categories", "var(--text-muted)");
+    var expenseTotal = expenseSegments.reduce(function(s, seg){ return s + seg.amount; }, 0);
+
+    var incTypes = incomeTypesList();
+    var incTotalsByType = incomeTypeTotals(tracker, monthKey);
+    var incomeItems = [];
+    incTypes.forEach(function(t, i){
+      var amt = incTotalsByType[t.id] || 0;
+      if(amt > 0) incomeItems.push({ label: t.emoji + " " + t.label, amount: amt, color: "var(" + seriesVarFor(i) + ")" });
+    });
+    var incomeSegments = buildBreakdownSegments(incomeItems, "Other sources", "var(--text-muted)");
+    var incomeTotal = incomeSegments.reduce(function(s, seg){ return s + seg.amount; }, 0);
+
+    var html = '<section>';
+    html += '  <div class="section-head"><span class="section-title">🧭 Monthly breakdown</span><span class="section-hint">' + (monthKey ? escapeHtml(periodLabel) : "All-time") + '</span></div>';
+    html += '  <div style="display:flex;gap:14px;flex-wrap:wrap">';
+
+    html += '    <div class="card" style="flex:1 1 300px;padding:16px">';
+    html += '      <div style="font-size:13px;font-weight:500;color:var(--text-secondary);margin-bottom:2px">💸 Expenses by category</div>';
+    if(expenseTotal > 0){
+      html += '      <div style="font-family:\'IBM Plex Mono\',monospace;font-size:20px;font-weight:500;margin-bottom:12px">' + currency.format(expenseTotal) + '</div>';
+      html += renderShareBar(expenseSegments, "expense-breakdown-clip-" + tracker, "Expenses by category, " + periodLabel);
+    } else {
+      html += '      <div class="empty-note" style="padding:16px 0">No expenses logged ' + (monthKey ? "this month" : "yet") + '.</div>';
+    }
+    html += '    </div>';
+
+    html += '    <div class="card" style="flex:1 1 300px;padding:16px">';
+    html += '      <div style="font-size:13px;font-weight:500;color:var(--text-secondary);margin-bottom:2px">💵 Income by source</div>';
+    if(incomeTotal > 0){
+      html += '      <div style="font-family:\'IBM Plex Mono\',monospace;font-size:20px;font-weight:500;margin-bottom:12px">' + currency.format(incomeTotal) + '</div>';
+      html += renderShareBar(incomeSegments, "income-breakdown-clip-" + tracker, "Income by source, " + periodLabel);
+    } else {
+      html += '      <div class="empty-note" style="padding:16px 0">No income logged ' + (monthKey ? "this month" : "yet") + '.</div>';
+    }
+    html += '    </div>';
+
+    html += '  </div>';
+    html += '</section>';
     return html;
   }
 
