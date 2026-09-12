@@ -1414,6 +1414,11 @@
       wedding: { q: "", category: "", subcategory: "", type: "", txType: "", dateFrom: "", dateTo: "", amountMin: "", amountMax: "" }
     },
     logFilterExpanded: { personal: false, wedding: false },
+    incomeLogFilter: {
+      personal: { q: "", type: "", dateFrom: "", dateTo: "", amountMin: "", amountMax: "" },
+      wedding: { q: "", type: "", dateFrom: "", dateTo: "", amountMin: "", amountMax: "" }
+    },
+    incomeLogFilterExpanded: { personal: false, wedding: false },
     importPreview: null,
     backupImportPreview: null,
     backupImportError: null,
@@ -2706,6 +2711,7 @@
     var html = subnavHtml(tracker);
     html += renderIncomeSection(tracker);
     html += renderRecurringIncomeSection(tracker);
+    html += renderIncomeLogSection(tracker);
     return html;
   }
 
@@ -2916,12 +2922,11 @@
 
   function renderIncomeSection(tracker){
     var items = (state.income[tracker] && state.income[tracker].items) || [];
-    var sorted = items.slice().sort(function(a, b){ return (b.date || "").localeCompare(a.date || ""); });
     var total = items.reduce(function(s, i){ return s + (Number(i.amount) || 0); }, 0);
     var typeTotals = incomeTypeTotals(tracker, null);
     var types = incomeTypesList();
     var html = '<section>';
-    html += '  <div class="section-head"><span class="section-title">📥 Income</span><span class="section-hint">' + (items.length ? currency.format(total) + ' logged total' : (tracker === "wedding" ? "Gifts, contributions, or cash toward the wedding" : "Paychecks, bonuses, gifts, or other money coming in")) + '</span></div>';
+    html += '  <div class="section-head"><span class="section-title">📥 Log income</span><span class="section-hint">' + (items.length ? currency.format(total) + ' logged total' : (tracker === "wedding" ? "Gifts, contributions, or cash toward the wedding" : "Paychecks, bonuses, gifts, or other money coming in")) + '</span></div>';
     html += '  <div class="card">';
     if(items.length > 0){
       html += '  <div class="ptype-row" style="padding:14px 16px 0;grid-template-columns:repeat(' + Math.min(types.length, 4) + ',1fr)">';
@@ -2929,24 +2934,6 @@
         html += '<div class="ptype-tile"><div class="ptype-label">' + t.emoji + ' ' + t.label + '</div><div class="ptype-value">' + currency.format(typeTotals[t.id] || 0) + '</div></div>';
       });
       html += '  </div>';
-    }
-    if(sorted.length === 0){
-      html += '<div class="sub-empty">No income logged yet.</div>';
-    } else {
-      html += '<div class="sub-list">';
-      sorted.forEach(function(i){
-        var typeMeta = incomeTypeMeta(i.type || "other");
-        html += '<div class="sub-row">';
-        html += '  <span class="sub-name">' + escapeHtml(i.source) + '</span>';
-        html += '  <span class="sub-meta">' + typeMeta.emoji + ' ' + typeMeta.label + (i.subcategory ? ' · ' + escapeHtml(i.subcategory) : '') + '</span>';
-        if(i.vendor) html += '  <span class="sub-meta">' + escapeHtml(i.vendor) + '</span>';
-        html += '  <span class="sub-meta">' + fmtDate(i.date) + '</span>';
-        if(i.note) html += '  <span class="sub-meta">' + escapeHtml(i.note) + '</span>';
-        html += '  <span class="sub-amount" style="color:var(--status-good)">+' + currency.format(i.amount) + '</span>';
-        html += '  <span class="sub-actions"><button class="mini-btn danger" data-action="remove-income" data-tracker="' + tracker + '" data-id="' + i.id + '">Remove</button></span>';
-        html += '</div>';
-      });
-      html += '</div>';
     }
     html += '  <form class="sub-add-form" data-action="add-income" data-tracker="' + tracker + '">';
     html += '    <div class="field"><label>Source</label><input type="text" name="source" placeholder="' + (tracker === "wedding" ? "e.g. Parents' contribution" : "e.g. Paycheck") + '" maxlength="60" required></div>';
@@ -2970,6 +2957,97 @@
     html += '    </form>';
     html += '  </div>';
     html += '  </div>';
+    html += '</section>';
+
+    return html;
+  }
+
+  function filteredIncomeLog(tracker){
+    var f = state.incomeLogFilter[tracker];
+    var amountMin = parseFloat(f.amountMin);
+    var amountMax = parseFloat(f.amountMax);
+    var items = ((state.income[tracker] && state.income[tracker].items) || []).filter(function(i){
+      if(f.type && (i.type || "other") !== f.type) return false;
+      if(f.dateFrom && (i.date || "") < f.dateFrom) return false;
+      if(f.dateTo && (i.date || "") > f.dateTo) return false;
+      if(!isNaN(amountMin) && (Number(i.amount) || 0) < amountMin) return false;
+      if(!isNaN(amountMax) && (Number(i.amount) || 0) > amountMax) return false;
+      if(f.q){
+        var q = f.q.toLowerCase();
+        var typeMeta = incomeTypeMeta(i.type || "other");
+        var scheduleWords = i.recurringIncomeId ? ("recurring " + ((INCOME_FREQUENCIES.find(function(fr){ return fr.id === i.frequency; }) || {}).label || "")) : "one-time";
+        var hay = ((i.source || "") + " " + (i.note || "") + " " + (i.vendor || "") + " " + typeMeta.label + " " + scheduleWords).toLowerCase();
+        if(hay.indexOf(q) === -1) return false;
+      }
+      return true;
+    });
+    return items.slice().sort(function(a, b){ return (b.date || "").localeCompare(a.date || ""); });
+  }
+
+  function renderIncomeLogTableHtml(tracker){
+    var allItems = (state.income[tracker] && state.income[tracker].items) || [];
+    var items = filteredIncomeLog(tracker);
+    if(items.length === 0){
+      return '<div class="empty-note">No matching income' + (allItems.length ? ' — try clearing a filter.' : ' logged yet.') + '</div>';
+    }
+    var showVendor = allItems.some(function(i){ return !!i.vendor; });
+    var types = incomeTypesList();
+    var html = '<table class="tx-table"><thead><tr><th class="th-date">Date</th><th>Source</th><th>Type</th><th>Schedule</th>' + (showVendor ? '<th class="th-pm">Vendor</th>' : '') + '<th class="th-note">Note</th><th class="th-amount" style="text-align:right">Amount</th><th class="th-actions"></th></tr></thead><tbody>';
+    items.slice(0, 150).forEach(function(i){
+      var typeMeta = incomeTypeMeta(i.type || "other");
+      var typeIdx = types.findIndex(function(t){ return t.id === (i.type || "other"); });
+      var swatchVar = seriesVarFor(typeIdx < 0 ? 0 : typeIdx);
+      var isRecurring = !!i.recurringIncomeId;
+      var freqLabel = i.frequency ? ((INCOME_FREQUENCIES.find(function(f){ return f.id === i.frequency; }) || {}).label || i.frequency) : "";
+      var scheduleCell = isRecurring
+        ? '<span class="sub-cycle-badge" style="color:var(--status-good);border-color:var(--status-good)" title="Applied automatically from Recurring income">🔁 ' + escapeHtml(freqLabel || "Recurring") + '</span>'
+        : '<span style="color:var(--text-muted);font-size:12.5px">One-time</span>';
+      html += '<tr>';
+      html += '<td class="tx-date">' + fmtDate(i.date) + '</td>';
+      html += '<td class="tx-cat"><span class="swatch" style="background:var(' + swatchVar + ')"></span>' + escapeHtml(i.source) + (i.subcategory ? ' <span style="color:var(--text-muted);font-size:12px">· ' + escapeHtml(i.subcategory) + '</span>' : '') + '</td>';
+      html += '<td class="tx-pm">' + typeMeta.emoji + ' ' + escapeHtml(typeMeta.label) + '</td>';
+      html += '<td class="tx-pm">' + scheduleCell + '</td>';
+      if(showVendor){
+        html += '<td class="tx-pm">' + (i.vendor ? escapeHtml(i.vendor) : '—') + '</td>';
+      }
+      html += '<td class="tx-note" title="' + escapeHtml(i.note || "") + '"><span class="tx-note-text">' + escapeHtml(i.note || "") + '</span></td>';
+      html += '<td class="tx-amount" style="color:var(--status-good)">+' + currencyPrecise.format(Number(i.amount) || 0) + '</td>';
+      html += '<td class="tx-actions"><button class="row-delete" data-action="remove-income" data-tracker="' + tracker + '" data-id="' + i.id + '" title="Remove">Remove</button></td>';
+      html += '</tr>';
+    });
+    html += '</tbody></table>';
+    return html;
+  }
+
+  function updateIncomeLogTable(tracker){
+    var wrap = document.getElementById("income-log-table-wrap-" + tracker);
+    if(wrap) wrap.innerHTML = renderIncomeLogTableHtml(tracker);
+  }
+
+  function renderIncomeLogSection(tracker){
+    var f = state.incomeLogFilter[tracker];
+    var types = incomeTypesList();
+    var filterInputStyle = "font-size:13.5px;background:var(--surface-2);border:1px solid var(--border-strong);border-radius:7px;padding:7px 10px;color:var(--text-primary)";
+    var isFilterExpanded = !!(state.incomeLogFilterExpanded && state.incomeLogFilterExpanded[tracker]);
+    var html = '<section>';
+    html += '  <div class="section-head"><span class="section-title">📒 Income log</span></div>';
+    html += '  <div class="card" style="padding:12px 16px;display:flex;flex-direction:column;gap:10px">';
+    html += '    <div style="display:flex;gap:10px;flex-wrap:wrap">';
+    html += '      <input type="text" id="income-log-search-' + tracker + '" placeholder="🔍 Search source or notes…" value="' + escapeHtml(f.q) + '" style="flex:2 1 180px;font-family:\'Work Sans\',sans-serif;' + filterInputStyle + '">';
+    html += '      <select id="income-log-filter-type-' + tracker + '" style="flex:1 1 150px;' + filterInputStyle + '"><option value="">All types</option>' + types.map(function(t){ return '<option value="' + t.id + '"' + (f.type === t.id ? ' selected' : '') + '>' + t.emoji + ' ' + t.label + '</option>'; }).join("") + '</select>';
+    html += '      <button type="button" class="subcat-toggle" data-action="toggle-income-log-filters" data-tracker="' + tracker + '">⚙️ More filters' + (isFilterExpanded ? ' ▴' : ' ▾') + '</button>';
+    html += '    </div>';
+    if(isFilterExpanded){
+      html += '    <div style="display:flex;gap:10px;flex-wrap:wrap;padding-top:10px;border-top:1px solid var(--border)">';
+      html += '      <label style="display:flex;align-items:center;gap:6px;font-size:12.5px;color:var(--text-secondary)">From <input type="date" id="income-log-filter-datefrom-' + tracker + '" value="' + escapeHtml(f.dateFrom) + '" style="' + filterInputStyle + '"></label>';
+      html += '      <label style="display:flex;align-items:center;gap:6px;font-size:12.5px;color:var(--text-secondary)">To <input type="date" id="income-log-filter-dateto-' + tracker + '" value="' + escapeHtml(f.dateTo) + '" style="' + filterInputStyle + '"></label>';
+      html += '      <label style="display:flex;align-items:center;gap:6px;font-size:12.5px;color:var(--text-secondary)">Min $ <input type="number" min="0" step="0.01" id="income-log-filter-amountmin-' + tracker + '" value="' + escapeHtml(f.amountMin) + '" placeholder="0.00" style="width:90px;' + filterInputStyle + '"></label>';
+      html += '      <label style="display:flex;align-items:center;gap:6px;font-size:12.5px;color:var(--text-secondary)">Max $ <input type="number" min="0" step="0.01" id="income-log-filter-amountmax-' + tracker + '" value="' + escapeHtml(f.amountMax) + '" placeholder="0.00" style="width:90px;' + filterInputStyle + '"></label>';
+      html += '      <button type="button" class="ghost-btn" data-action="clear-income-log-filters" data-tracker="' + tracker + '">✕ Clear filters</button>';
+      html += '    </div>';
+    }
+    html += '  </div>';
+    html += '  <div class="card table-scroll" id="income-log-table-wrap-' + tracker + '" style="margin-top:10px">' + renderIncomeLogTableHtml(tracker) + '</div>';
     html += '</section>';
     return html;
   }
@@ -3296,6 +3374,20 @@
       renderPanel(state.tracker);
       return;
     }
+    var toggleIncomeLogFiltersBtn = ev.target.closest('[data-action="toggle-income-log-filters"]');
+    if(toggleIncomeLogFiltersBtn){
+      var tilf = toggleIncomeLogFiltersBtn.dataset.tracker;
+      state.incomeLogFilterExpanded[tilf] = !state.incomeLogFilterExpanded[tilf];
+      renderPanel(state.tracker);
+      return;
+    }
+    var clearIncomeLogFiltersBtn = ev.target.closest('[data-action="clear-income-log-filters"]');
+    if(clearIncomeLogFiltersBtn){
+      var ticlf = clearIncomeLogFiltersBtn.dataset.tracker;
+      state.incomeLogFilter[ticlf] = { q: "", type: "", dateFrom: "", dateTo: "", amountMin: "", amountMax: "" };
+      renderPanel(state.tracker);
+      return;
+    }
     var removeSubBtn = ev.target.closest('[data-action="remove-subscription"]');
     if(removeSubBtn){
       removeSubscription(removeSubBtn.dataset.tracker, removeSubBtn.dataset.id);
@@ -3539,6 +3631,12 @@
     if(dateFromMatch){ state.logFilter[dateFromMatch[1]].dateFrom = ev.target.value; updateLogTable(dateFromMatch[1]); return; }
     var dateToMatch = ev.target.id.match(/^log-filter-dateto-(personal|wedding)$/);
     if(dateToMatch){ state.logFilter[dateToMatch[1]].dateTo = ev.target.value; updateLogTable(dateToMatch[1]); return; }
+    var incTypeMatch = ev.target.id.match(/^income-log-filter-type-(personal|wedding)$/);
+    if(incTypeMatch){ state.incomeLogFilter[incTypeMatch[1]].type = ev.target.value; updateIncomeLogTable(incTypeMatch[1]); return; }
+    var incDateFromMatch = ev.target.id.match(/^income-log-filter-datefrom-(personal|wedding)$/);
+    if(incDateFromMatch){ state.incomeLogFilter[incDateFromMatch[1]].dateFrom = ev.target.value; updateIncomeLogTable(incDateFromMatch[1]); return; }
+    var incDateToMatch = ev.target.id.match(/^income-log-filter-dateto-(personal|wedding)$/);
+    if(incDateToMatch){ state.incomeLogFilter[incDateToMatch[1]].dateTo = ev.target.value; updateIncomeLogTable(incDateToMatch[1]); return; }
   });
 
   document.addEventListener("input", function(ev){
@@ -3564,6 +3662,30 @@
       state.logFilter[trMax].amountMax = ev.target.value;
       clearTimeout(state.logFilter[trMax]._tMax);
       state.logFilter[trMax]._tMax = setTimeout(function(){ updateLogTable(trMax); }, 200);
+      return;
+    }
+    var incSearchMatch = ev.target.id.match(/^income-log-search-(personal|wedding)$/);
+    if(incSearchMatch){
+      var itr = incSearchMatch[1];
+      state.incomeLogFilter[itr].q = ev.target.value;
+      clearTimeout(state.incomeLogFilter[itr]._t);
+      state.incomeLogFilter[itr]._t = setTimeout(function(){ updateIncomeLogTable(itr); }, 120);
+      return;
+    }
+    var incAmountMinMatch = ev.target.id.match(/^income-log-filter-amountmin-(personal|wedding)$/);
+    if(incAmountMinMatch){
+      var itrMin = incAmountMinMatch[1];
+      state.incomeLogFilter[itrMin].amountMin = ev.target.value;
+      clearTimeout(state.incomeLogFilter[itrMin]._tMin);
+      state.incomeLogFilter[itrMin]._tMin = setTimeout(function(){ updateIncomeLogTable(itrMin); }, 200);
+      return;
+    }
+    var incAmountMaxMatch = ev.target.id.match(/^income-log-filter-amountmax-(personal|wedding)$/);
+    if(incAmountMaxMatch){
+      var itrMax = incAmountMaxMatch[1];
+      state.incomeLogFilter[itrMax].amountMax = ev.target.value;
+      clearTimeout(state.incomeLogFilter[itrMax]._tMax);
+      state.incomeLogFilter[itrMax]._tMax = setTimeout(function(){ updateIncomeLogTable(itrMax); }, 200);
       return;
     }
   });
@@ -4295,7 +4417,9 @@
       vendor: r.vendor || null,
       amount: Number(r.amount) || 0,
       date: r.nextDate,
-      note: r.note || ""
+      note: r.note || "",
+      recurringIncomeId: r.id,
+      frequency: r.frequency
     });
     r.nextDate = addToDate(r.nextDate, r.frequency);
   }
