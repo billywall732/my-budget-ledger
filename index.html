@@ -1420,6 +1420,8 @@
     },
     incomeLogFilterExpanded: { personal: false, wedding: false },
     importPreview: null,
+    bulkImport: null,
+    bulkImportError: null,
     backupImportPreview: null,
     backupImportError: null,
     histCaption: { personal: null, wedding: null },
@@ -3109,9 +3111,17 @@
 
   function renderDataSection(){
     var html = '<section>';
-    html += '  <div class="section-head"><span class="section-title">🗃️ Your data</span><span class="section-hint">Export your transactions, bulk-import from a bank CSV, or back up everything</span></div>';
+    html += '  <div class="section-head"><span class="section-title">🗃️ Your data</span><span class="section-hint">Bulk-import from Excel, export your transactions, or back up everything</span></div>';
     html += '  <div class="card" style="padding:16px;display:flex;flex-direction:column;gap:14px">';
-    html += '    <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:center">';
+    html += '    <div style="display:flex;flex-direction:column;gap:10px">';
+    html += '      <div class="section-hint"><b style="color:var(--text-primary)">Bulk import from Excel</b> — download the template, fill in one row per transaction (the Lists tab has your categories, cards, and accounts), then upload it. You&#39;ll review every row before anything is added.</div>';
+    html += '      <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:center">';
+    html += '        <button type="button" class="ghost-btn" data-action="download-import-template">⬇️ Download import template (.xlsx)</button>';
+    html += '        <label class="ghost-btn" style="cursor:pointer">⬆️ Upload filled template<input type="file" id="bulk-file-input" accept=".xlsx,.xls,.csv,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,application/vnd.ms-excel,text/csv" hidden></label>';
+    html += '      </div>';
+    html += renderBulkImportPreview();
+    html += '    </div>';
+    html += '    <div style="border-top:1px solid var(--border);padding-top:14px;display:flex;gap:10px;flex-wrap:wrap;align-items:center">';
     html += '      <button type="button" class="ghost-btn" data-action="export-csv">📤 Export all transactions (CSV)</button>';
     html += '      <label class="ghost-btn" style="cursor:pointer">📥 Import from bank CSV<input type="file" id="csv-file-input" accept=".csv,text/csv" hidden></label>';
     html += '    </div>';
@@ -3127,6 +3137,52 @@
     html += '    </div>';
     html += '  </div>';
     html += '</section>';
+    return html;
+  }
+
+  function renderBulkImportPreview(){
+    if(state.bulkImportError){
+      return '<div class="section-hint" style="color:var(--status-critical)">' + escapeHtml(state.bulkImportError) + '</div>';
+    }
+    if(!state.bulkImport) return '';
+    var b = state.bulkImport;
+    var valid = b.rows.filter(function(r){ return !r.errors.length; });
+    var picked = valid.filter(function(r){ return r.include; });
+    var invalidCount = b.rows.length - valid.length;
+    var flagged = valid.filter(function(r){ return r.issues.length; }).length;
+    var total = picked.reduce(function(s, r){ return s + r.amount; }, 0);
+
+    var html = '<div style="border-top:1px solid var(--border);padding-top:12px">';
+    html += '<div class="section-hint" style="margin-bottom:10px"><b style="color:var(--text-primary)">' + escapeHtml(b.fileName) + '</b>: ' + b.rows.length + ' row' + (b.rows.length === 1 ? '' : 's') + ' found';
+    if(invalidCount) html += ', <b style="color:var(--status-critical)">' + invalidCount + ' can&#39;t be imported</b>';
+    if(flagged) html += ', ' + flagged + ' with notes to check';
+    html += '. ' + (b.truncated ? 'Only the first ' + BULK_MAX_ROWS + ' rows were read. ' : '') + 'Fix categories here or uncheck rows you don&#39;t want.</div>';
+
+    html += '<div class="table-scroll" style="max-height:420px;overflow-y:auto;border:1px solid var(--border);border-radius:8px"><table class="tx-table" style="min-width:1100px"><thead><tr>';
+    html += '<th><input type="checkbox" data-role="bulk-toggle-all" aria-label="Select all"' + (picked.length === valid.length && valid.length ? ' checked' : '') + '></th>';
+    html += '<th>Row</th><th>Tracker</th><th>Date</th><th>Category</th><th>Subcategory</th><th>Vendor</th><th>Payment</th><th style="text-align:right">Amount</th><th>Note</th><th>Check</th></tr></thead><tbody>';
+    b.rows.forEach(function(r, i){
+      var bad = r.errors.length > 0;
+      html += '<tr' + (bad ? ' style="opacity:.6"' : '') + '>';
+      html += '<td><input type="checkbox" data-role="bulk-row-toggle" data-idx="' + i + '"' + (r.include ? ' checked' : '') + (bad ? ' disabled' : '') + '></td>';
+      html += '<td class="tx-date">' + r.line + '</td>';
+      html += '<td>' + (r.tracker === "wedding" ? "Wedding" : "Personal") + '</td>';
+      html += '<td class="tx-date">' + (r.date ? fmtDate(r.date) : '—') + '</td>';
+      var cats = (state.budgets[r.tracker] && state.budgets[r.tracker].categories) || [];
+      html += '<td>' + (bad ? escapeHtml(r.category) : '<select data-role="bulk-row-category" data-idx="' + i + '">' + cats.map(function(c){ return '<option value="' + escapeHtml(c.name) + '"' + (c.name === r.category ? ' selected' : '') + '>' + escapeHtml(c.name) + '</option>'; }).join("") + '</select>') + '</td>';
+      html += '<td class="tx-note">' + escapeHtml(r.subcategory || '') + '</td>';
+      html += '<td class="tx-note">' + escapeHtml(r.vendor || '') + '</td>';
+      html += '<td class="tx-pm">' + escapeHtml(paymentLabel(r)) + '</td>';
+      html += '<td class="tx-amount">' + (r.amount ? currencyPrecise.format(r.amount) : '—') + '</td>';
+      html += '<td class="tx-note">' + escapeHtml(r.note) + '</td>';
+      var msgs = r.errors.map(function(m){ return '<span style="color:var(--status-critical)">✖ ' + escapeHtml(m) + '</span>'; })
+        .concat(r.issues.map(function(m){ return '<span style="color:var(--text-secondary)">⚠️ ' + escapeHtml(m) + '</span>'; }));
+      html += '<td style="font-size:12px;min-width:220px">' + (msgs.length ? msgs.join('<br>') : '<span style="color:var(--text-muted)">✓</span>') + '</td>';
+      html += '</tr>';
+    });
+    html += '</tbody></table></div>';
+    html += '<div style="display:flex;gap:8px;margin-top:12px;flex-wrap:wrap;align-items:center"><button type="button" class="submit-btn neutral" data-action="confirm-bulk-import"' + (picked.length ? '' : ' disabled') + '>✅ Import ' + picked.length + ' transaction' + (picked.length === 1 ? '' : 's') + ' (' + currencyPrecise.format(total) + ')</button><button type="button" class="ghost-btn" data-action="cancel-bulk-import">Cancel</button></div>';
+    html += '</div>';
     return html;
   }
 
@@ -3463,6 +3519,20 @@
       exportCsv();
       return;
     }
+    if(ev.target.closest('[data-action="download-import-template"]')){
+      downloadImportTemplate();
+      return;
+    }
+    if(ev.target.closest('[data-action="confirm-bulk-import"]')){
+      confirmBulkImport();
+      return;
+    }
+    if(ev.target.closest('[data-action="cancel-bulk-import"]')){
+      state.bulkImport = null;
+      state.bulkImportError = null;
+      render();
+      return;
+    }
     var exportBackupBtn = ev.target.closest('[data-action="export-backup"]');
     if(exportBackupBtn){
       exportBackup();
@@ -3600,6 +3670,30 @@
     }
     if(ev.target.matches('[data-role="import-row-category"]')){
       if(state.importPreview) state.importPreview.rows[Number(ev.target.dataset.idx)].category = ev.target.value;
+      return;
+    }
+    if(ev.target.matches('[data-role="bulk-row-toggle"]')){
+      if(state.bulkImport) state.bulkImport.rows[Number(ev.target.dataset.idx)].include = ev.target.checked;
+      refreshBulkImportControls();
+      return;
+    }
+    if(ev.target.matches('[data-role="bulk-toggle-all"]')){
+      if(state.bulkImport){
+        var allOn = ev.target.checked;
+        state.bulkImport.rows.forEach(function(r){ if(!r.errors.length) r.include = allOn; });
+        document.querySelectorAll('[data-role="bulk-row-toggle"]:not(:disabled)').forEach(function(cb){ cb.checked = allOn; });
+      }
+      refreshBulkImportControls();
+      return;
+    }
+    if(ev.target.matches('[data-role="bulk-row-category"]')){
+      if(state.bulkImport) state.bulkImport.rows[Number(ev.target.dataset.idx)].category = ev.target.value;
+      return;
+    }
+    if(ev.target.id === "bulk-file-input"){
+      var xfile = ev.target.files && ev.target.files[0];
+      ev.target.value = "";
+      if(xfile) handleBulkFile(xfile);
       return;
     }
     if(ev.target.id === "csv-file-input"){
@@ -4773,6 +4867,357 @@
     });
     state.importPreview = null;
     render();
+  }
+
+  // ---------- Bulk import via Excel template ----------
+  // SheetJS is only loaded when someone actually downloads or uploads a
+  // spreadsheet, so the rest of the app stays dependency-free.
+
+  var SHEETJS_URL = "https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js";
+  var BULK_COLUMNS = ["Tracker", "Date", "Category", "Subcategory", "Vendor", "Payment Type", "Card/Account", "Amount", "Note"];
+  var BULK_MAX_ROWS = 2000;
+  var sheetJsPromise = null;
+
+  function loadSheetJs(){
+    if(window.XLSX) return Promise.resolve(window.XLSX);
+    if(sheetJsPromise) return sheetJsPromise;
+    sheetJsPromise = new Promise(function(resolve, reject){
+      var s = document.createElement("script");
+      s.src = SHEETJS_URL;
+      s.async = true;
+      s.onload = function(){ window.XLSX ? resolve(window.XLSX) : reject(new Error("Spreadsheet library failed to initialize")); };
+      s.onerror = function(){ sheetJsPromise = null; reject(new Error("Couldn't load the spreadsheet library — check your connection")); };
+      document.head.appendChild(s);
+    });
+    return sheetJsPromise;
+  }
+
+  function accountDisplayName(acct){
+    return acct.name + (acct.last4 ? " ••" + acct.last4 : "");
+  }
+
+  function buildTemplateListsAoa(){
+    var cols = [];
+    cols.push(["Tracker", "Personal", "Wedding"]);
+    cols.push(["Payment Type"].concat(PAYMENT_TYPES.map(function(t){ return t.label; })));
+    cols.push(["Card (Credit Card / Miles)"].concat((state.paymentMethods.items || []).map(accountDisplayName)));
+    cols.push(["Bank Account (Bank Transfer)"].concat((state.bankAccounts.items || []).map(accountDisplayName)));
+    ["personal", "wedding"].forEach(function(t){
+      var label = t === "wedding" ? "Wedding" : "Personal";
+      var cats = (state.budgets[t] && state.budgets[t].categories) || [];
+      cols.push([label + " Category"].concat(cats.map(function(c){ return c.name; })));
+      cols.push([label + " Subcategories"].concat(cats.map(function(c){ return (c.subcategories || []).join(", "); })));
+    });
+    cols.push(["Wedding Vendor"].concat((state.vendors.wedding && state.vendors.wedding.items || []).map(function(v){ return v.name; })));
+
+    var height = cols.reduce(function(m, c){ return Math.max(m, c.length); }, 0);
+    var aoa = [];
+    for(var r = 0; r < height; r++){
+      aoa.push(cols.map(function(c){ return c[r] == null ? "" : c[r]; }));
+    }
+    return aoa;
+  }
+
+  function buildTemplateInstructionsAoa(){
+    return [
+      ["Budget Ledger — bulk import template"],
+      [""],
+      ["1. Fill in one row per transaction on the \"Transactions\" sheet. Keep the header row as-is."],
+      ["2. Only Date and Amount are required. Blank Tracker defaults to whichever tracker you have open when you upload."],
+      ["3. Save the file (.xlsx, or CSV if you prefer) and upload it with \"Upload filled template\" in the Your data section."],
+      ["4. You'll see a preview of every row first — nothing is added until you click Import."],
+      [""],
+      ["Column", "What to enter", "Example"],
+      ["Tracker", "Personal or Wedding", "Personal"],
+      ["Date", "A date — an Excel date cell, or text like 2026-10-10 or 10/10/2026", "2026-10-10"],
+      ["Category", "A category from the Lists sheet for that tracker. Unknown names fall back to Other (you can change it in the preview).", "Groceries"],
+      ["Subcategory", "Optional. Suggestions are on the Lists sheet.", "Supermarket"],
+      ["Vendor", "Optional store / payee. On the Wedding tracker, a name matching one of your vendors counts toward that vendor's paid total.", "Trader Joe's"],
+      ["Payment Type", "Cash, Bank Transfer, Credit Card, or Miles / Points. Blank = Cash.", "Credit Card"],
+      ["Card/Account", "Optional. A card or bank account name from the Lists sheet (the ••1234 suffix is optional).", "Chase Sapphire"],
+      ["Amount", "A positive number. $ signs and commas are fine; negative signs are ignored.", "84.12"],
+      ["Note", "Optional free text (up to 200 characters).", "Weekly shop"],
+      [""],
+      ["Tip: a CSV from \"Export all transactions\" uses these same columns, so you can edit an export and upload it too. Rows that match a transaction you already have are flagged as duplicates and unchecked."]
+    ];
+  }
+
+  function downloadImportTemplate(){
+    loadSheetJs().then(function(XLSX){
+      var wb = XLSX.utils.book_new();
+
+      var tx = XLSX.utils.aoa_to_sheet([BULK_COLUMNS]);
+      tx["!cols"] = [{ wch: 10 }, { wch: 12 }, { wch: 18 }, { wch: 18 }, { wch: 20 }, { wch: 15 }, { wch: 22 }, { wch: 11 }, { wch: 36 }];
+      XLSX.utils.book_append_sheet(wb, tx, "Transactions");
+
+      var instr = XLSX.utils.aoa_to_sheet(buildTemplateInstructionsAoa());
+      instr["!cols"] = [{ wch: 16 }, { wch: 90 }, { wch: 18 }];
+      XLSX.utils.book_append_sheet(wb, instr, "Instructions");
+
+      var listsAoa = buildTemplateListsAoa();
+      var lists = XLSX.utils.aoa_to_sheet(listsAoa);
+      lists["!cols"] = listsAoa[0].map(function(){ return { wch: 24 }; });
+      XLSX.utils.book_append_sheet(wb, lists, "Lists");
+
+      var filename = "budget-ledger-import-template.xlsx";
+      XLSX.writeFile(wb, filename);
+      showToast("Downloaded " + filename);
+    }).catch(function(){
+      // Offline fallback: a header-only CSV still opens fine in Excel.
+      downloadFile("budget-ledger-import-template.csv", BULK_COLUMNS.join(",") + "\r\n", "text/csv");
+      showToast("Spreadsheet library unavailable — downloaded a CSV template instead");
+    });
+  }
+
+  function handleBulkFile(file){
+    var name = (file.name || "").toLowerCase();
+    var isCsv = /\.csv$/.test(name) || file.type === "text/csv";
+    state.bulkImportError = null;
+    var reader = new FileReader();
+    if(isCsv){
+      reader.onload = function(){
+        processBulkRows(parseCsv(String(reader.result || "")), file.name, null);
+      };
+      reader.readAsText(file);
+      return;
+    }
+    reader.onload = function(){
+      var buf = reader.result;
+      loadSheetJs().then(function(XLSX){
+        var wb;
+        try{ wb = XLSX.read(new Uint8Array(buf), { type: "array" }); }
+        catch(e){ return failBulk("That file couldn't be read as a spreadsheet. Save it as .xlsx or .csv and try again."); }
+        var sheetName = wb.SheetNames.find(function(n){ return n.trim().toLowerCase() === "transactions"; }) || wb.SheetNames[0];
+        var rows = XLSX.utils.sheet_to_json(wb.Sheets[sheetName], { header: 1, raw: true, defval: "", blankrows: false });
+        processBulkRows(rows, file.name, XLSX);
+      }).catch(function(err){ failBulk(err.message); });
+    };
+    reader.readAsArrayBuffer(file);
+  }
+
+  function failBulk(msg){
+    state.bulkImport = null;
+    state.bulkImportError = msg;
+    render();
+  }
+
+  function bulkParseDate(v, XLSX){
+    if(v == null || v === "") return null;
+    if(typeof v === "number"){
+      if(!XLSX) return null;
+      var dc = XLSX.SSF.parse_date_code(v);
+      if(!dc || !dc.y) return null;
+      return dc.y + "-" + String(dc.m).padStart(2, "0") + "-" + String(dc.d).padStart(2, "0");
+    }
+    var s = String(v).trim();
+    var iso = s.match(/^(\d{4})-(\d{1,2})-(\d{1,2})/);
+    if(iso) return iso[1] + "-" + iso[2].padStart(2, "0") + "-" + iso[3].padStart(2, "0");
+    var us = s.match(/^(\d{1,2})\/(\d{1,2})\/(\d{2}|\d{4})$/);
+    if(us){
+      var y = us[3].length === 2 ? "20" + us[3] : us[3];
+      return y + "-" + us[1].padStart(2, "0") + "-" + us[2].padStart(2, "0");
+    }
+    var d = new Date(s);
+    if(isNaN(d.getTime())) return null;
+    return d.getFullYear() + "-" + String(d.getMonth() + 1).padStart(2, "0") + "-" + String(d.getDate()).padStart(2, "0");
+  }
+
+  function bulkParseAmount(v){
+    if(typeof v === "number") return Math.abs(v);
+    var n = parseFloat(String(v == null ? "" : v).replace(/[^0-9.\-]/g, ""));
+    return isNaN(n) ? 0 : Math.abs(n);
+  }
+
+  function bulkMatchPaymentType(v){
+    var s = String(v || "").trim().toLowerCase();
+    if(!s) return { id: "cash" };
+    var exact = PAYMENT_TYPES.find(function(t){ return t.id === s || t.label.toLowerCase() === s; });
+    if(exact) return { id: exact.id };
+    if(/mile|point/.test(s)) return { id: "miles" };
+    if(/credit|card/.test(s)) return { id: "credit" };
+    if(/bank|transfer|debit|ach|check/.test(s)) return { id: "bank_transfer" };
+    if(/cash/.test(s)) return { id: "cash" };
+    return { id: "cash", warn: "Payment type \"" + String(v).trim() + "\" not recognized — using Cash" };
+  }
+
+  function bulkMatchAccount(kind, v){
+    var s = String(v || "").trim();
+    if(!s) return null;
+    var list = kind === "bank" ? (state.bankAccounts.items || []) : (state.paymentMethods.items || []);
+    var bare = s.replace(/\s*[•*.]+\s*\d{4}\s*$/, "").trim().toLowerCase();
+    var digits = (s.match(/(\d{4})\s*$/) || [])[1];
+    return list.find(function(a){ return accountDisplayName(a).toLowerCase() === s.toLowerCase(); }) ||
+      list.find(function(a){ return a.name.toLowerCase() === bare; }) ||
+      (digits ? list.find(function(a){ return a.last4 === digits; }) : null) ||
+      null;
+  }
+
+  function expenseDupKey(tracker, date, amount, category, note){
+    return [tracker, date, (Number(amount) || 0).toFixed(2), String(category || "").toLowerCase(), String(note || "").trim().toLowerCase()].join("|");
+  }
+
+  function processBulkRows(rows, fileName, XLSX){
+    if(!rows || rows.length < 2) return failBulk("No transactions found — fill in at least one row under the header.");
+    var header = rows[0].map(function(h){ return String(h == null ? "" : h).trim().toLowerCase(); });
+    function col(re){ return header.findIndex(function(h){ return re.test(h); }); }
+    var idx = {
+      tracker: col(/^tracker$/),
+      date: col(/date/),
+      category: col(/^category$/),
+      subcategory: col(/^sub-?category$/),
+      vendor: col(/^(vendor|payee|merchant)$/),
+      type: col(/^payment\s*type$/),
+      account: col(/^(card\s*\/\s*account|card|account)$/),
+      amount: col(/^amount$/),
+      note: col(/^(note|notes|description|memo)$/)
+    };
+    if(idx.date === -1 || idx.amount === -1){
+      return failBulk("Couldn't find Date and Amount columns. Use the downloadable template (or keep its header row) and try again.");
+    }
+
+    var existing = {};
+    state.expenses.forEach(function(e){ existing[expenseDupKey(e.tracker, e.date, e.amount, e.category, e.note)] = true; });
+    var seenInFile = {};
+
+    var out = [];
+    var dataRows = rows.slice(1);
+    var truncated = dataRows.length > BULK_MAX_ROWS;
+    dataRows.slice(0, BULK_MAX_ROWS).forEach(function(r, i){
+      function cell(k){ return idx[k] >= 0 ? r[idx[k]] : ""; }
+      function text(k){ var v = cell(k); return String(v == null ? "" : v).trim(); }
+      if(!r.some(function(v){ return String(v == null ? "" : v).trim() !== ""; })) return;
+
+      var issues = [];
+      var errors = [];
+
+      var trackerRaw = text("tracker").toLowerCase();
+      var tracker = trackerRaw === "wedding" ? "wedding" : trackerRaw === "personal" ? "personal" : state.tracker;
+      if(trackerRaw && trackerRaw !== "wedding" && trackerRaw !== "personal") issues.push("Tracker \"" + text("tracker") + "\" not recognized — using " + (tracker === "wedding" ? "Wedding" : "Personal"));
+
+      var date = bulkParseDate(cell("date"), XLSX);
+      if(!date) errors.push(text("date") ? "Date \"" + text("date") + "\" isn't a valid date" : "Missing date");
+
+      var amount = Math.round(bulkParseAmount(cell("amount")) * 100) / 100;
+      if(!amount) errors.push("Missing or zero amount");
+
+      var cats = (state.budgets[tracker] && state.budgets[tracker].categories) || [];
+      var catRaw = text("category");
+      var catMatch = cats.find(function(c){ return c.name.toLowerCase() === catRaw.toLowerCase(); });
+      var category = catMatch ? catMatch.name : (cats.find(function(c){ return c.name === "Other"; }) ? "Other" : (cats[0] ? cats[0].name : "Other"));
+      if(catRaw && !catMatch) issues.push("Category \"" + catRaw + "\" not found — using " + category);
+
+      var subcategory = text("subcategory").slice(0, 30);
+      if(subcategory && catMatch){
+        var subMatch = (catMatch.subcategories || []).find(function(s){ return s.toLowerCase() === subcategory.toLowerCase(); });
+        if(subMatch) subcategory = subMatch;
+      }
+
+      var pt = bulkMatchPaymentType(cell("type"));
+      if(pt.warn) issues.push(pt.warn);
+      var meta = paymentTypeMeta(pt.id);
+      var cardId = null;
+      var acctRaw = text("account");
+      if(acctRaw){
+        if(meta.needsAccount){
+          var acct = bulkMatchAccount(meta.accountKind, acctRaw);
+          if(acct) cardId = acct.id;
+          else issues.push((meta.accountKind === "bank" ? "Bank account" : "Card") + " \"" + acctRaw + "\" not found — left blank");
+        } else {
+          issues.push("Card/Account ignored for Cash");
+        }
+      }
+
+      var vendor = text("vendor").slice(0, 60);
+      var vendorId = null;
+      if(tracker === "wedding" && vendor){
+        var vm = (state.vendors.wedding.items || []).find(function(v){ return v.name.toLowerCase() === vendor.toLowerCase(); });
+        if(vm){ vendorId = vm.id; vendor = vm.name; }
+      }
+
+      var note = text("note").slice(0, 200);
+
+      var dup = false;
+      if(!errors.length){
+        var key = expenseDupKey(tracker, date, amount, category, note);
+        if(existing[key]){ dup = true; issues.push("Looks like a transaction you already have"); }
+        else if(seenInFile[key]){ issues.push("Same as another row in this file"); }
+        seenInFile[key] = true;
+      }
+
+      out.push({
+        line: i + 2,
+        tracker: tracker,
+        date: date,
+        amount: amount,
+        category: category,
+        subcategory: subcategory || null,
+        vendor: vendor || null,
+        vendorId: vendorId,
+        paymentType: pt.id,
+        cardId: cardId,
+        note: note,
+        errors: errors,
+        issues: issues,
+        include: !errors.length && !dup
+      });
+    });
+
+    if(!out.length) return failBulk("No transactions found — fill in at least one row under the header.");
+    state.bulkImportError = null;
+    state.bulkImport = { fileName: fileName, rows: out, truncated: truncated };
+    render();
+  }
+
+  // Row toggles update the button in place rather than re-rendering, so the
+  // preview table keeps its scroll position.
+  function refreshBulkImportControls(){
+    if(!state.bulkImport) return;
+    var valid = state.bulkImport.rows.filter(function(r){ return !r.errors.length; });
+    var picked = valid.filter(function(r){ return r.include; });
+    var total = picked.reduce(function(s, r){ return s + r.amount; }, 0);
+    var btn = document.querySelector('[data-action="confirm-bulk-import"]');
+    if(btn){
+      btn.disabled = !picked.length;
+      btn.textContent = "✅ Import " + picked.length + " transaction" + (picked.length === 1 ? "" : "s") + " (" + currencyPrecise.format(total) + ")";
+    }
+    var all = document.querySelector('[data-role="bulk-toggle-all"]');
+    if(all) all.checked = picked.length === valid.length && valid.length > 0;
+  }
+
+  function confirmBulkImport(){
+    if(!state.bulkImport) return;
+    var picked = state.bulkImport.rows.filter(function(r){ return r.include && !r.errors.length; });
+    var trackersTouched = {};
+    var total = 0;
+    picked.forEach(function(r){
+      var expense = normalizeExpense({
+        tracker: r.tracker,
+        category: r.category,
+        subcategory: r.subcategory,
+        vendor: r.vendor,
+        vendorId: r.vendorId,
+        amount: r.amount,
+        date: r.date,
+        note: r.note,
+        paymentType: r.paymentType,
+        cardId: r.cardId,
+        createdAt: new Date().toISOString()
+      });
+      if(expense.tracker === "wedding" && expense.vendorId){
+        applyVendorPaymentAmount(expense.vendorId, expense.amount);
+      }
+      state.expenses.push(Object.assign({ id: uid("exp") }, expense));
+      trackersTouched[r.tracker] = (trackersTouched[r.tracker] || 0) + 1;
+      total += r.amount;
+    });
+    state.expenses.sort(function(a, b){ return (b.date || "").localeCompare(a.date || ""); });
+    Object.keys(trackersTouched).forEach(function(t){
+      recordChange(t, "Bulk-imported " + trackersTouched[t] + " transaction" + (trackersTouched[t] === 1 ? "" : "s") + " from " + state.bulkImport.fileName);
+    });
+    state.bulkImport = null;
+    schedulePersist();
+    render();
+    showToast("Imported " + picked.length + " transaction" + (picked.length === 1 ? "" : "s") + " (" + currencyPrecise.format(total) + ")");
   }
 
   // ---------- Google Drive auth + sync ----------
