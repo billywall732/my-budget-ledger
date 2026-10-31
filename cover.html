@@ -5,91 +5,355 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>Budget Ledger</title>
 <meta name="description" content="Personal spending and wedding costs, tracked side by side.">
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,600&family=Work+Sans:wght@400;600&display=swap">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IM+Fell+English:ital@0;1&family=IM+Fell+English+SC&family=Caveat:wght@500;700&display=swap">
 <script>
   // Use the ledger's saved theme (index.html) so the cover matches it.
   try{ var t = localStorage.getItem("budgetLedgerTheme"); if(t) document.documentElement.setAttribute("data-theme", t); }catch(e){}
 </script>
 <style>
+  /* The cover is a page from an old accountant's ledger, lying on a desk: aged paper, green
+     ruling, a red double margin rule, entries written in ink, and rubber stamps. In dark mode the
+     desk is lamp-lit at night; the page itself stays paper. No figures appear anywhere. */
   :root{
     color-scheme: light;
-    --bg: #f7f2e9;
-    --text-primary: #221d15;
-    --text-secondary: #6e6656;
-    --accent: #2f6f62;
-    --on-accent: #ffffff;
+    --desk: #cdb894;
+    --desk-2: #b49a70;
+    --paper: #f4ead2;
+    --paper-edge: #e3d2a9;
+    --ink: #2a2118;
+    --ink-soft: #5a4a36;
+    --ink-blue: #233a6b;
+    --rule-green: rgba(58, 110, 82, 0.45);
+    --rule-green-strong: rgba(58, 110, 82, 0.8);
+    --rule-red: rgba(170, 52, 40, 0.7);
+    --stamp-green: #2f6f62;
+    --stamp-red: #a8352a;
+    --shadow: 0 2px 4px rgba(60, 40, 15, 0.18), 0 22px 50px -18px rgba(60, 40, 15, 0.55);
+    --font-title: "IM Fell English", "Iowan Old Style", Georgia, serif;
+    --font-sc: "IM Fell English SC", "Iowan Old Style", Georgia, serif;
+    --font-hand: "Caveat", "Segoe Print", "Bradley Hand", cursive;
   }
   @media (prefers-color-scheme: dark){
     :root:not([data-theme="light"]):not([data-theme="editorial"]){
       color-scheme: dark;
-      --bg: #16130e;
-      --text-primary: #f4efe4;
-      --text-secondary: #c7bea9;
-      --accent: #59a892;
-      --on-accent: #16130e;
+      --desk: #1f1812;
+      --desk-2: #120d09;
+      --paper: #e6d8b6;
+      --paper-edge: #cdb98d;
+      --shadow: 0 2px 4px rgba(0, 0, 0, 0.5), 0 28px 60px -16px rgba(0, 0, 0, 0.85);
     }
   }
   :root[data-theme="dark"]{
     color-scheme: dark;
-    --bg: #16130e;
-    --text-primary: #f4efe4;
-    --text-secondary: #c7bea9;
-    --accent: #59a892;
-    --on-accent: #16130e;
+    --desk: #1f1812;
+    --desk-2: #120d09;
+    --paper: #e6d8b6;
+    --paper-edge: #cdb98d;
+    --shadow: 0 2px 4px rgba(0, 0, 0, 0.5), 0 28px 60px -16px rgba(0, 0, 0, 0.85);
   }
-  :root[data-theme="editorial"]{
-    --bg: #ece5d3;
-    --text-primary: #1c1913;
-    --text-secondary: #4a4436;
-    --accent: #2f4a3a;
-  }
+
+  *{ box-sizing: border-box; }
+  html, body{ min-height: 100%; }
   body{
     margin: 0;
+    color: var(--ink);
+    font-family: var(--font-title);
+    font-size: 17px;
+    line-height: 1.5;
+    /* The desk: a warm pool of lamplight over wood grain */
+    background:
+      radial-gradient(120% 80% at 50% 0%, rgba(255, 236, 190, 0.35), transparent 60%),
+      repeating-linear-gradient(92deg, rgba(0, 0, 0, 0.035) 0 2px, transparent 2px 9px, rgba(0, 0, 0, 0.025) 9px 10px, transparent 10px 23px),
+      linear-gradient(180deg, var(--desk), var(--desk-2));
+    background-attachment: fixed;
+  }
+
+  .desk{
     min-height: 100vh;
+    min-height: 100dvh;
     display: grid;
     place-items: center;
-    padding: 40px 24px;
-    box-sizing: border-box;
-    background: var(--bg);
-    color: var(--text-primary);
-    font-family: "Work Sans", system-ui, -apple-system, sans-serif;
-    font-size: 16px;
-    line-height: 1.5;
+    padding: calc(40px + env(safe-area-inset-top, 0px)) 24px calc(48px + env(safe-area-inset-bottom, 0px));
   }
-  main{ max-width: 520px; }
+
+  /* ---------- The page ---------- */
+  .page{
+    position: relative;
+    width: 100%;
+    max-width: 780px;
+    padding: 56px 64px 48px 104px;
+    border-radius: 3px;
+    background:
+      /* a coffee ring and foxing, the marks of an old book */
+      radial-gradient(circle at 12% 90%, transparent 52px, rgba(140, 90, 40, 0.13) 53px, rgba(140, 90, 40, 0.06) 58px, transparent 60px),
+      radial-gradient(60% 50% at 0% 100%, rgba(150, 110, 50, 0.14), transparent 70%),
+      radial-gradient(50% 40% at 100% 0%, rgba(150, 110, 50, 0.1), transparent 70%),
+      url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='220' height='220'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.85' numOctaves='3' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 .38 0 0 0 0 .27 0 0 0 0 .12 0 0 0 .09 0'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E"),
+      linear-gradient(180deg, var(--paper), var(--paper-edge));
+    box-shadow: var(--shadow), inset 0 0 60px rgba(150, 110, 50, 0.18);
+    transform: rotate(-0.8deg);
+    animation: settle .7s cubic-bezier(.2, .9, .3, 1) both;
+  }
+  /* Red double margin rule, full height of the page */
+  .page::before{
+    content: "";
+    position: absolute;
+    top: 0; bottom: 0; left: 76px;
+    width: 6px;
+    border-left: 1.5px solid var(--rule-red);
+    border-right: 1.5px solid var(--rule-red);
+    pointer-events: none;
+  }
+  /* Binding holes down the left edge */
+  .page::after{
+    content: "";
+    position: absolute;
+    left: 26px; top: 0; bottom: 0;
+    width: 18px;
+    background: radial-gradient(circle at 9px 50%, var(--desk-2) 0 8px, rgba(0, 0, 0, 0.15) 8.5px, transparent 10px) 0 22% / 18px 28% repeat-y;
+    opacity: .85;
+    pointer-events: none;
+  }
+
+  /* ---------- Heading ---------- */
+  .kicker{
+    margin: 0 0 6px;
+    font-family: var(--font-sc);
+    font-size: 15px;
+    letter-spacing: .22em;
+    color: var(--ink-soft);
+  }
   h1{
-    font-family: "Fraunces", Georgia, serif;
-    font-weight: 600;
-    font-size: clamp(40px, 8vw, 56px);
-    line-height: 1.05;
-    margin: 0 0 10px;
+    margin: 0;
+    font-family: var(--font-title);
+    font-weight: 400;
+    font-size: clamp(48px, 9vw, 82px);
+    line-height: .95;
+    letter-spacing: -0.01em;
   }
-  .tagline{ font-size: 18px; color: var(--text-secondary); margin: 0 0 24px; text-wrap: balance; }
-  ul{ margin: 0 0 32px; padding-left: 20px; color: var(--text-secondary); }
-  li + li{ margin-top: 6px; }
-  .cta{
+  .tagline{
+    margin: 12px 0 0;
+    font-style: italic;
+    font-size: clamp(18px, 2.4vw, 21px);
+    color: var(--ink-soft);
+    text-wrap: balance;
+  }
+  .double-rule{
+    height: 6px;
+    margin: 26px 0 0;
+    border-top: 1.5px solid var(--rule-green-strong);
+    border-bottom: 1.5px solid var(--rule-green-strong);
+  }
+
+  /* ---------- Rubber stamps ---------- */
+  .head-row{
+    display: flex;
+    flex-wrap: wrap;
+    align-items: flex-end;
+    justify-content: space-between;
+    gap: 14px 24px;
+    margin-top: 12px;
+  }
+  .head-row .tagline{ margin: 0; flex: 1 1 260px; }
+  .stamps{
+    display: flex;
+    gap: 14px;
+    flex: none;
+    padding: 0 4px 2px;
+  }
+  .stamp{
     display: inline-block;
-    padding: 12px 24px;
-    border-radius: 100px;
-    background: var(--accent);
-    color: var(--on-accent);
-    font-weight: 600;
-    text-decoration: none;
+    padding: 4px 12px 2px;
+    font-family: var(--font-sc);
+    font-size: 19px;
+    letter-spacing: .14em;
+    border: 4px double currentColor;
+    border-radius: 6px;
+    opacity: .92;
+    mix-blend-mode: multiply;
+    /* Uneven ink: the stamp didn't press down evenly */
+    -webkit-mask-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='120' height='60'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.9' numOctaves='2'/%3E%3CfeColorMatrix values='0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 -2.2 1.9'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+            mask-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='120' height='60'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.9' numOctaves='2'/%3E%3CfeColorMatrix values='0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 -2.2 1.9'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+    animation: thump .45s cubic-bezier(.3, 1.6, .5, 1) both;
   }
-  .cta:hover{ filter: brightness(1.1); }
-  .cta:focus-visible{ outline: 3px solid var(--text-primary); outline-offset: 3px; }
+  .stamp.personal{ color: var(--stamp-green); --r: -7deg; transform: rotate(var(--r)); animation-delay: .55s; }
+  .stamp.wedding{ color: var(--stamp-red); --r: 5deg; transform: rotate(var(--r)); animation-delay: .8s; }
+
+  /* ---------- The entries ---------- */
+  table{
+    width: 100%;
+    margin-top: 4px;
+    border-collapse: collapse;
+  }
+  th{
+    font-family: var(--font-sc);
+    font-weight: 400;
+    font-size: 14px;
+    letter-spacing: .14em;
+    color: var(--ink-soft);
+    text-align: left;
+    padding: 10px 10px 6px;
+    border-bottom: 1.5px solid var(--rule-green-strong);
+  }
+  td{
+    height: 58px;
+    padding: 4px 10px;
+    border-bottom: 1px solid var(--rule-green);
+    vertical-align: bottom;
+  }
+  th + th, td + td{ border-left: 1px solid var(--rule-green); }
+  .col-folio{ width: 64px; text-align: center; }
+  th.col-folio{ text-align: center; }
+  .col-check{ width: 92px; text-align: center; }
+  th.col-check{ text-align: center; }
+  td.col-folio{ font-style: italic; font-size: 18px; color: var(--ink-soft); padding-bottom: 10px; }
+  .ink{
+    display: inline-block;
+    font-family: var(--font-hand);
+    font-weight: 500;
+    font-size: clamp(23px, 3vw, 28px);
+    line-height: 1.15;
+    color: var(--ink-blue);
+    padding-bottom: 4px;
+    animation: write 1s steps(28, end) both;
+  }
+  .tick{
+    display: inline-block;
+    font-family: var(--font-hand);
+    font-weight: 700;
+    font-size: 32px;
+    line-height: 1;
+    color: var(--stamp-red);
+    transform: rotate(-8deg);
+    animation: pop .3s ease-out both;
+  }
+  tbody tr:nth-child(1) .ink{ animation-delay: 1.0s; }
+  tbody tr:nth-child(2) .ink{ animation-delay: 1.7s; }
+  tbody tr:nth-child(3) .ink{ animation-delay: 2.4s; }
+  tbody tr:nth-child(1) .tick{ animation-delay: 1.9s; }
+  tbody tr:nth-child(2) .tick{ animation-delay: 2.6s; }
+  tbody tr:nth-child(3) .tick{ animation-delay: 3.3s; }
+
+  /* ---------- Carried forward ---------- */
+  .forward{
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: flex-end;
+    gap: 10px 18px;
+    margin-top: 30px;
+  }
+  .forward .hand{
+    font-family: var(--font-hand);
+    font-size: 26px;
+    color: var(--ink-blue);
+    transform: rotate(-3deg);
+  }
+  .cta{
+    display: inline-flex;
+    align-items: center;
+    gap: 12px;
+    padding: 12px 26px 10px;
+    font-family: var(--font-sc);
+    font-size: 23px;
+    letter-spacing: .12em;
+    color: #fbf3e0;
+    background: var(--stamp-green);
+    border: 3px double rgba(251, 243, 224, 0.7);
+    border-radius: 8px;
+    outline: 2px solid var(--stamp-green);
+    outline-offset: 2px;
+    text-decoration: none;
+    box-shadow: 0 3px 0 #1d4a40, 0 8px 18px -6px rgba(30, 60, 50, 0.6);
+    transform: rotate(-1.5deg);
+    transition: transform .15s ease, box-shadow .15s ease;
+  }
+  .cta:hover{ transform: rotate(0deg) translateY(-2px); box-shadow: 0 5px 0 #1d4a40, 0 14px 24px -8px rgba(30, 60, 50, 0.6); }
+  .cta:active{ transform: rotate(0deg) translateY(2px); box-shadow: 0 1px 0 #1d4a40, 0 4px 8px -4px rgba(30, 60, 50, 0.6); }
+  .cta:focus-visible{ outline: 3px solid var(--stamp-red); outline-offset: 4px; }
+  .cta .arrow{ font-family: var(--font-title); transition: transform .15s ease; }
+  .cta:hover .arrow{ transform: translateX(4px); }
+
+  .note{
+    margin: 22px 0 0;
+    font-style: italic;
+    font-size: 15px;
+    color: var(--ink-soft);
+    text-align: right;
+  }
+
+  .sr{ position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+
+  /* ---------- Motion ---------- */
+  @keyframes settle{ from{ opacity: 0; transform: translateY(30px) rotate(-3deg); } to{ opacity: 1; transform: rotate(var(--tilt, -0.8deg)); } }
+  @keyframes thump{ from{ opacity: 0; transform: scale(1.8) rotate(var(--r)); } to{ opacity: .92; transform: scale(1) rotate(var(--r)); } }
+  @keyframes write{ from{ clip-path: inset(0 100% 0 0); } to{ clip-path: inset(0 0 0 0); } }
+  @keyframes pop{ from{ opacity: 0; transform: scale(2) rotate(-8deg); } to{ opacity: 1; transform: scale(1) rotate(-8deg); } }
+  @media (prefers-reduced-motion: reduce){
+    *, *::before, *::after{ animation: none !important; transition: none !important; }
+  }
+
+  /* ---------- Phones ---------- */
+  @media (max-width: 640px){
+    body{ font-size: 16px; }
+    .desk{ padding: calc(18px + env(safe-area-inset-top, 0px)) 12px calc(24px + env(safe-area-inset-bottom, 0px)); place-items: start center; }
+    .page{ --tilt: -0.4deg; padding: 34px 18px 30px 52px; transform: rotate(var(--tilt)); }
+    .page::before{ left: 38px; width: 5px; }
+    .page::after{ left: 10px; width: 16px; background: radial-gradient(circle at 8px 50%, var(--desk-2) 0 6px, rgba(0, 0, 0, 0.15) 6.5px, transparent 8px) 0 22% / 16px 30% repeat-y; }
+    .kicker{ font-size: 12.5px; letter-spacing: .16em; }
+    h1{ font-size: clamp(42px, 13vw, 56px); }
+    .stamp{ font-size: 16px; }
+    .double-rule{ margin-top: 20px; }
+    .col-folio{ width: 38px; }
+    .col-check{ width: 52px; }
+    th{ font-size: 12px; letter-spacing: .08em; padding-inline: 6px; }
+    td{ height: auto; padding: 12px 6px 6px; }
+    .ink{ font-size: 23px; }
+    .tick{ font-size: 28px; }
+    .forward{ flex-direction: column; align-items: stretch; margin-top: 24px; }
+    .forward .hand{ align-self: flex-start; font-size: 24px; }
+    .cta{ justify-content: center; transform: none; font-size: 21px; }
+    .cta:hover{ transform: translateY(-2px); }
+    .note{ text-align: left; }
+  }
 </style>
 </head>
 <body>
-<main>
-  <h1>Budget Ledger</h1>
-  <p class="tagline">Personal spending and wedding costs, tracked side by side.</p>
-  <ul>
-    <li>Personal and wedding budgets, side by side</li>
-    <li>Log expenses and income</li>
-    <li>Saved to your own Google Drive</li>
-  </ul>
-  <a class="cta" href="./">Open Ledger →</a>
+<main class="desk">
+  <article class="page">
+    <header>
+      <p class="kicker">Household accounts &middot; kept by hand</p>
+      <h1>Budget Ledger</h1>
+      <div class="head-row">
+        <p class="tagline">Personal spending and wedding costs, tracked side by side.</p>
+        <div class="stamps">
+          <span class="stamp personal">Personal</span>
+          <span class="stamp wedding">Wedding</span>
+        </div>
+      </div>
+      <div class="double-rule" aria-hidden="true"></div>
+    </header>
+
+    <table>
+      <caption class="sr">What the ledger does</caption>
+      <thead>
+        <tr><th class="col-folio" scope="col">Folio</th><th scope="col">Particulars</th><th class="col-check" scope="col">Entered</th></tr>
+      </thead>
+      <tbody>
+        <tr><td class="col-folio">i.</td><td><span class="ink">Personal &amp; wedding budgets, side by side</span></td><td class="col-check"><span class="tick" role="img" aria-label="yes">&#10003;</span></td></tr>
+        <tr><td class="col-folio">ii.</td><td><span class="ink">Log expenses &amp; income as they happen</span></td><td class="col-check"><span class="tick" role="img" aria-label="yes">&#10003;</span></td></tr>
+        <tr><td class="col-folio">iii.</td><td><span class="ink">Kept safe in your own Google Drive</span></td><td class="col-check"><span class="tick" role="img" aria-label="yes">&#10003;</span></td></tr>
+      </tbody>
+    </table>
+
+    <div class="forward">
+      <span class="hand" aria-hidden="true">carried forward &rarr;</span>
+      <a class="cta" href="./">Open Ledger <span class="arrow" aria-hidden="true">&rarr;</span></a>
+    </div>
+    <p class="note">No sign-in needed to look around.</p>
+  </article>
 </main>
 </body>
 </html>
