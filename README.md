@@ -1,8 +1,26 @@
-# My Budget Ledger
+<p align="center">
+  <img src="docs/cover.svg" alt="My Budget Ledger — personal and wedding budgets, synced to your own Google Drive" width="100%">
+</p>
 
-A single-file, no-build budget tracker for personal expenses and a wedding budget, backed by your own Google Drive — no server, no database, no account to create beyond your Gmail login.
+<h1 align="center">My Budget Ledger</h1>
 
-**Live app:** https://billywall732.github.io/my-budget-ledger/
+<p align="center">
+  <em>A single-file, no-build budget tracker for personal expenses and a wedding budget, backed by your own Google Drive — no server, no database, no account to create beyond your Gmail login.</em>
+</p>
+
+<p align="center">
+  <a href="https://billywall732.github.io/my-budget-ledger/"><strong>Open the live app →</strong></a>
+</p>
+
+<p align="center">
+  <a href="#using-the-app">Using the app</a> ·
+  <a href="#features">Features</a> ·
+  <a href="#running-it-locally">Running it locally</a> ·
+  <a href="#setting-up-your-own-google-drive-sync-optional-one-time">Drive sync setup</a> ·
+  <a href="#tech">Tech</a>
+</p>
+
+---
 
 ## Using the app
 
