@@ -29,7 +29,7 @@
     <text x="369" y="378" text-anchor="middle" fill="#a8552f">Wedding</text>
   </g>
 
-  <text x="150" y="450" font-family="'IBM Plex Mono', Consolas, 'Courier New', monospace" font-size="18" fill="#7a6f5e">billywall732.github.io/my-budget-ledger</text>
+  <text x="150" y="450" font-family="'IBM Plex Mono', Consolas, 'Courier New', monospace" font-size="18" fill="#7a6f5e">offthewall.dev/my-budget-ledger</text>
 
   <!-- spend vs budget chart -->
   <g transform="translate(870 130)">

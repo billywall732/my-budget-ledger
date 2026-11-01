@@ -9,7 +9,7 @@
 </p>
 
 <p align="center">
-  <a href="https://billywall732.github.io/my-budget-ledger/"><strong>Open the live app →</strong></a>
+  <a href="https://offthewall.dev/my-budget-ledger/"><strong>Open the live app →</strong></a>
 </p>
 
 <p align="center">
