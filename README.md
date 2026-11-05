@@ -73,3 +73,19 @@ The deployed app already has a configured Google OAuth client. If you fork this 
 ## Tech
 
 Plain HTML/CSS/JavaScript in a single file (`index.html`), no framework, no build tooling, no package manager. Deployed via GitHub Pages.
+
+| Piece | Used for |
+|---|---|
+| Google Identity Services | Sign-in with Google, `drive.file` scope only |
+| Google Drive API (v3) | Saving and syncing the one JSON data file in your own Drive |
+| IndexedDB + localStorage | Working offline and remembering settings in the browser |
+| SheetJS (loaded on demand) | The Excel import template and bulk import |
+| Hand-drawn SVG | Every chart, with no chart library |
+| Web Share API | The share button |
+| GitHub Pages | Hosting, at https://offthewall.dev/my-budget-ledger/ |
+
+Ideas for what's next are tracked in [GitHub Issues](https://github.com/billywall732/my-budget-ledger/issues).
+
+## License
+
+[MIT](LICENSE)
