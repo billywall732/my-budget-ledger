@@ -1225,6 +1225,13 @@
     background: var(--status-warning-text);
     color: var(--surface);
   }
+  /* With two buttons, the message takes the room and the buttons sit together */
+  #save-banner > span{ flex: 1 1 260px; }
+  #save-banner .banner-retry + .banner-retry{
+    background: transparent;
+    color: var(--text-primary);
+    box-shadow: inset 0 0 0 1.5px var(--text-primary);
+  }
   [hidden]{ display: none !important; }
 
   @media (max-width: 560px){
@@ -1400,6 +1407,8 @@
     personalMonth: currentMonthKey(),
     sample: null,
     sampleImagesOk: false,
+    demo: false, // showing "Try with sample data": never saved
+
     scanTracker: null,
     budgets: { personal: null, wedding: null },
     expenses: [],
@@ -3398,6 +3407,14 @@
       connectDrive();
       return;
     }
+    if(ev.target.closest('[data-action="load-sample"]')){
+      loadSampleData();
+      return;
+    }
+    if(ev.target.closest('[data-action="clear-sample"]')){
+      clearSampleData();
+      return;
+    }
     var removeCardBtn = ev.target.closest('[data-action="remove-card"]');
     if(removeCardBtn){
       removePaymentMethod(removeCardBtn.dataset.id);
@@ -4245,6 +4262,9 @@
       btn = '<button type="button" class="banner-retry" data-action="' + opts.action + '">' + (opts.actionLabel || "↻ Try again") + '</button>';
     } else if(opts.retry){
       btn = '<button type="button" class="banner-retry" data-action="reload-page">↻ Try reconnecting</button>';
+    }
+    if(opts.action2){
+      btn += '<button type="button" class="banner-retry" data-action="' + opts.action2 + '">' + (opts.action2Label || "") + '</button>';
     }
     el.innerHTML = "<span>" + escapeHtml(msg) + "</span>" + btn;
   }
@@ -5238,6 +5258,8 @@
   }
 
   function connectDrive(){
+    // Leaving the sample: start from a clean slate, so sample data can never reach Drive
+    if(state.demo) resetToStarter();
     if(!driveConfigured()){
       showBanner("This copy hasn't been set up with a Google Client ID yet. See the \"GOOGLE DRIVE SETUP\" comment near the top of the file for the one-time steps, paste your Client ID in, then reload.", { warn: true });
       return;
@@ -5425,6 +5447,8 @@
   }
 
   function schedulePersist(){
+    // Sample data is never saved, to the browser or to Drive
+    if(state.demo){ updateOverBudgetCategories(); return; }
     if(persistTimer) clearTimeout(persistTimer);
     persistTimer = setTimeout(function(){
       persistTimer = null;
@@ -5960,7 +5984,7 @@
     initSample();
 
     if(!driveConfigured()){
-      showBanner("This copy hasn't been set up with a Google Client ID yet, so what's shown below are starter placeholders that won't be saved. See the \"GOOGLE DRIVE SETUP\" comment near the top of the file for the one-time steps.", { warn: true });
+      showBanner("This copy hasn't been set up with a Google Client ID yet, so what's shown below are starter placeholders that won't be saved. See the \"GOOGLE DRIVE SETUP\" comment near the top of the file for the one-time steps.", { warn: true, action: "load-sample", actionLabel: "👀 Try with sample data" });
       return;
     }
 
@@ -5969,9 +5993,153 @@
       drive.accessToken = savedAuth.accessToken;
       showBanner("Loading your data from Google Drive…");
       loadFromDrive();
+    } else if(/[?&]sample\b/.test(location.search)){
+      loadSampleData(); // a link straight into the sample (the cover's "Try it with sample data")
     } else {
-      showBanner("Connect Google Drive to load and save your data.", { action: "connect-drive", actionLabel: "🔗 Connect Google Drive" });
+      showStartBanner();
     }
+  }
+
+  function showStartBanner(){
+    showBanner("Connect Google Drive to load and save your data, or look around with made-up numbers first.", { action: "connect-drive", actionLabel: "🔗 Connect Google Drive", action2: "load-sample", action2Label: "👀 Try with sample data" });
+  }
+
+  // ---------- Sample data ----------
+  // "Try with sample data" fills both trackers with made-up numbers so a visitor can see every chart
+  // without signing in. It's never saved (schedulePersist skips it), dates are placed relative to
+  // today so the current month always has activity, and the same day always gives the same numbers.
+  // Connecting Google Drive or "Clear sample data" goes back to a clean slate.
+
+  function resetToStarter(){
+    state.demo = false;
+    applyLoadedData({ budgets: { personal: DEFAULT_BUDGETS.personal, wedding: DEFAULT_BUDGETS.wedding } });
+    state.personalMonth = currentMonthKey();
+    state.page = "dashboard";
+  }
+
+  function loadSampleData(){
+    if(drive.connected) return; // real data is open: never mix the two
+    applyLoadedData(buildSampleData());
+    state.demo = true;
+    state.personalMonth = currentMonthKey();
+    state.page = "dashboard";
+    updateOverBudgetCategories();
+    showBanner("You're looking at sample data with made-up numbers. Nothing here is saved.", { action: "connect-drive", actionLabel: "🔗 Use my own data", action2: "clear-sample", action2Label: "✖ Clear sample data" });
+    render();
+    window.scrollTo(0, 0);
+  }
+
+  function clearSampleData(){
+    resetToStarter();
+    updateOverBudgetCategories();
+    if(driveConfigured()) showStartBanner();
+    else showBanner("Sample data cleared.", { action: "load-sample", actionLabel: "👀 Try with sample data" });
+    render();
+  }
+
+  function buildSampleData(){
+    // A small seeded random, so the sample is the same all day
+    var seed = Number(todayStr().replace(/-/g, "")) % 2147483647 || 1;
+    function rnd(){ seed = (seed * 48271) % 2147483647; return seed / 2147483647; }
+    function pick(list){ return list[Math.floor(rnd() * list.length)]; }
+    function money(min, max){ return Math.round((min + rnd() * (max - min)) * 100) / 100; }
+    function iso(d){ return d.getFullYear() + "-" + String(d.getMonth() + 1).padStart(2, "0") + "-" + String(d.getDate()).padStart(2, "0"); }
+    var today = new Date(); today.setHours(12, 0, 0, 0);
+    function daysAgo(n){ var d = new Date(today); d.setDate(d.getDate() - n); return iso(d); }
+    function daysAhead(n){ var d = new Date(today); d.setDate(d.getDate() + n); return iso(d); }
+    function inMonthAgo(m, day){ var d = new Date(today.getFullYear(), today.getMonth() - m, 1, 12); d.setDate(Math.min(day, new Date(d.getFullYear(), d.getMonth() + 1, 0).getDate())); return d > today ? null : iso(d); }
+    var n = 0;
+    function id(p){ n += 1; return p + "-sample" + n; }
+
+    var cards = [{ id: "card-sample-1", name: "Sapphire Preferred", last4: "4821" }, { id: "card-sample-2", name: "Gold Card", last4: "1009" }];
+    var bank = [{ id: "bank-sample-1", name: "Checking", last4: "7733" }];
+    function payWith(){ var r = rnd(); return r < 0.6 ? { paymentType: "credit", cardId: pick(cards).id } : r < 0.85 ? { paymentType: "bank_transfer", cardId: bank[0].id } : { paymentType: "cash", cardId: null }; }
+
+    var expenses = [];
+    function spend(tracker, date, category, subcategory, amount, note, extra){
+      if(!date) return;
+      expenses.push(Object.assign({ id: id("exp"), tracker: tracker, date: date, category: category, subcategory: subcategory, amount: amount, note: note || null, vendor: null, createdAt: date + "T12:00:00.000Z" }, payWith(), extra || {}));
+    }
+
+    // Personal: six months of everyday spending. Some months run a little over in a category or two.
+    for(var m = 5; m >= 0; m--){
+      spend("personal", inMonthAgo(m, 1), "Housing", "Rent/Mortgage", 1800, "Rent", { paymentType: "bank_transfer", cardId: bank[0].id });
+      spend("personal", inMonthAgo(m, 14), "Utilities", "Electric", money(70, 120), "Electric bill");
+      spend("personal", inMonthAgo(m, 16), "Utilities", "Internet", 65, "Internet");
+      spend("personal", inMonthAgo(m, 18), "Utilities", "Cell Phone", 55, "Phone plan");
+      spend("personal", inMonthAgo(m, 3), "Insurance", "Health Insurance", 140, "Health insurance");
+      spend("personal", inMonthAgo(m, 5), "Transportation", "Car Insurance", 96, "Car insurance");
+      spend("personal", inMonthAgo(m, 20), "Savings", "Roth IRA", 400, "Roth IRA contribution", { paymentType: "bank_transfer", cardId: bank[0].id });
+      for(var g = 0; g < 4; g++) spend("personal", inMonthAgo(m, 2 + g * 7 + Math.floor(rnd() * 4)), "Groceries", pick(["Supermarket", "Warehouse Club", "Farmers Market"]), money(70, 165), pick(["Weekly groceries", "Costco run", "Farmers market"]));
+      for(var f = 0; f < 6; f++) spend("personal", inMonthAgo(m, 1 + Math.floor(rnd() * 28)), "Food & Drink", pick(["Restaurant", "Coffee", "Delivery/Takeout", "Bar"]), money(6, m % 3 === 1 ? 90 : 55), pick(["Tacos", "Coffee", "Dinner out", "Pizza night", "Happy hour", "Brunch"]));
+      for(var t = 0; t < 2; t++) spend("personal", inMonthAgo(m, 4 + t * 13), "Transportation", "Gas", money(45, 70), "Gas");
+      if(rnd() < 0.7) spend("personal", inMonthAgo(m, 9 + Math.floor(rnd() * 12)), "Entertainment", pick(["Snowboarding", "Surfing", "Mountain Biking", "Movies"]), money(30, m === 2 ? 260 : 120), pick(["Lift ticket", "Board wax and leash", "Bike tune-up", "Movie night"]));
+      spend("personal", inMonthAgo(m, 22), "Other", pick(["Gifts", "Personal Care", "Miscellaneous"]), money(20, 90), pick(["Birthday gift", "Haircut", "Household stuff"]));
+    }
+
+    // Wedding: vendors with deposits paid, and the payments that go with them
+    var vendors = [
+      { name: "Seaside Gardens", category: "Venue", total: 8000, paid: 4000, due: 90 },
+      { name: "Golden Fork Catering", category: "Catering", total: 11500, paid: 3000, due: 120 },
+      { name: "Lens & Light Studio", category: "Photo & Video", total: 4200, paid: 1500, due: 60 },
+      { name: "Petal Co.", category: "Flowers & Decor", total: 2800, paid: 500, due: 75 },
+      { name: "DJ Night Shift", category: "Music & DJ", total: 1600, paid: 400, due: 100 }
+    ].map(function(v, i){
+      var vend = { id: "vendor-sample-" + (i + 1), name: v.name, category: v.category, total: v.total, paid: v.paid, dueDate: daysAhead(v.due), paymentType: "credit", cardId: cards[0].id };
+      spend("wedding", daysAgo(30 + i * 23), v.category, null, v.paid, "Deposit: " + v.name, { vendor: v.name, vendorId: vend.id, paymentType: "credit", cardId: cards[0].id });
+      return vend;
+    });
+    spend("wedding", daysAgo(40), "Attire", "Suit/Tux", 650, "Suit");
+    spend("wedding", daysAgo(26), "Attire", "Wedding Dress", 1450, "Dress");
+    // A few this month, so the wedding dashboard's current month has something in it
+    var early = function(k){ return inMonthAgo(0, Math.max(1, today.getDate() - k)); };
+    spend("wedding", early(3), "Catering", "Tastings", 120, "Menu tasting");
+    spend("wedding", early(2), "Rentals & Other", "Linens", 280, "Table linens");
+    spend("wedding", early(0), "Photo & Video", "Engagement Shoot", 350, "Engagement shoot");
+
+    // Income: paychecks on the 1st and 15th (so this month always has one), plus a bonus
+    var personalIncome = [];
+    for(var pm = 5; pm >= 0; pm--){
+      [1, 15].forEach(function(day){
+        var date = inMonthAgo(pm, day);
+        if(date) personalIncome.push({ id: id("inc"), source: "Paycheck", type: "salary", amount: 3050, date: date, note: null });
+      });
+    }
+    personalIncome.push({ id: id("inc"), source: "Quarterly bonus", type: "bonus", amount: 1200, date: daysAgo(48), note: null });
+    var weddingIncome = [
+      { id: id("inc"), source: "Wedding savings transfer", type: "other", amount: 6000, date: daysAgo(70), note: null },
+      { id: id("inc"), source: "Gift from family", type: "gift", amount: 3000, date: daysAgo(33), note: null },
+      { id: id("inc"), source: "Monthly wedding savings", type: "other", amount: 800, date: inMonthAgo(0, 1), note: null }
+    ];
+
+    return {
+      budgets: { personal: DEFAULT_BUDGETS.personal, wedding: DEFAULT_BUDGETS.wedding },
+      expenses: expenses,
+      paymentMethods: { items: cards },
+      bankAccounts: { items: bank },
+      subscriptions: {
+        personal: { items: [
+          { id: "sub-sample-1", name: "Streaming", amount: 15.49, cycle: "monthly", category: "Other", subcategory: "Subscriptions", vendor: null, paymentType: "credit", cardId: cards[1].id, nextDate: daysAhead(9), note: null },
+          { id: "sub-sample-2", name: "Music", amount: 10.99, cycle: "monthly", category: "Other", subcategory: "Subscriptions", vendor: null, paymentType: "credit", cardId: cards[1].id, nextDate: daysAhead(17), note: null },
+          { id: "sub-sample-3", name: "Gym", amount: 45, cycle: "monthly", category: "Other", subcategory: "Personal Care", vendor: null, paymentType: "credit", cardId: cards[0].id, nextDate: daysAhead(4), note: null }
+        ] },
+        wedding: { items: [] }
+      },
+      income: { personal: { items: personalIncome }, wedding: { items: weddingIncome } },
+      recurringIncome: { personal: { items: [] }, wedding: { items: [] } },
+      salarySetup: { annualSalary: 98000, payFrequency: "semimonthly", startDate: daysAgo(400), deductions: [
+        { id: "ded-sample-1", name: "401k", kind: "percent", value: 6, category: "pretax" },
+        { id: "ded-sample-2", name: "Health insurance", kind: "flat", value: 65, category: "pretax" },
+        { id: "ded-sample-3", name: "Federal tax", kind: "percent", value: 14, category: "tax" },
+        { id: "ded-sample-4", name: "State tax", kind: "percent", value: 5, category: "tax" }
+      ] },
+      vendors: { wedding: { items: vendors } },
+      savingsGoals: { items: [
+        { id: "goal-sample-1", name: "Emergency fund", target: 10000, current: 6200, monthlyContribution: 400, dueDate: null, createdAt: daysAgo(200) },
+        { id: "goal-sample-2", name: "Honeymoon", target: 6000, current: 1800, monthlyContribution: 300, dueDate: daysAhead(240), createdAt: daysAgo(90) }
+      ] },
+      changeLog: []
+    };
   }
 
   init();
