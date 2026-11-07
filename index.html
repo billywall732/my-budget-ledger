@@ -367,6 +367,7 @@
   .auth-dropdown-item.danger{
     color: var(--status-critical);
   }
+  .signin-soon{ font-size: 13px; color: var(--muted, #8a8172); white-space: nowrap; }
   .sign-in-btn{
     appearance: none;
     background: var(--accent-personal);
@@ -1280,7 +1281,7 @@
       <button type="button" class="icon-btn" id="theme-toggle-btn" data-action="cycle-theme" title="Switch theme" aria-label="Switch theme">☀️</button>
       <button type="button" class="icon-btn" id="share-btn" data-action="share-app" title="Share this app" aria-label="Share this app">🔗</button>
       <div class="auth-section guest" id="auth-section">
-        <button type="button" class="sign-in-btn" id="sign-in-btn" data-action="sign-in">Sign In with Google</button>
+        <span class="signin-soon" title="Google sign-in is switched off for now">Sign-in coming soon</span>
       </div>
     </div>
   </header>
@@ -1295,7 +1296,7 @@
   <div id="personal-panel" data-panel="personal"></div>
   <div id="wedding-panel" data-panel="wedding" hidden></div>
 
-  <footer class="foot">Numbers stay in this ledger — synced to any device you open it on.</footer>
+  <footer class="foot">Sign-in is coming soon: until then, nothing you enter here is saved. Anonymous visit counts, no cookies. · <a href="/privacy/">Privacy</a></footer>
   <div id="sync-status" class="sync-status"></div>
 </div>
 
@@ -1392,6 +1393,10 @@
   // Drive files.
   // =========================================================================
   var GOOGLE_CLIENT_ID = "335959224951-jbqspl556j7j1606nfsedduarrsheduc.apps.googleusercontent.com";
+  // Sign-in is switched off until https://offthewall.dev is an Authorized JavaScript origin on this
+  // OAuth client (Google Cloud Console → APIs & Services → Credentials). Google refuses sign-in from
+  // an unlisted origin, so the button would only fail. Set back to true once it's added.
+  var SIGN_IN_OPEN = false;
   var DRIVE_FILE_NAME = "budget-ledger-data.json";
 
   var currency = new Intl.NumberFormat("en-US", { style: "currency", currency: "USD", maximumFractionDigits: 0 });
@@ -5587,7 +5592,7 @@
         '</div>';
       authSection.classList.remove("guest");
     } else {
-      authSection.innerHTML = '<button type="button" class="sign-in-btn" id="sign-in-btn" data-action="sign-in">Sign In with Google</button>';
+      authSection.innerHTML = SIGN_IN_OPEN ? '<button type="button" class="sign-in-btn" id="sign-in-btn" data-action="sign-in">Sign In with Google</button>' : '<span class="signin-soon" title="Google sign-in is switched off for now">Sign-in coming soon</span>';
       authSection.classList.add("guest");
     }
   }
@@ -6001,6 +6006,7 @@
   }
 
   function showStartBanner(){
+    if(!SIGN_IN_OPEN){ showBanner("Sign-in is coming soon. Until then nothing you enter here is saved, so look around with made-up numbers.", { action: "load-sample", actionLabel: "👀 Try with sample data" }); return; }
     showBanner("Connect Google Drive to load and save your data, or look around with made-up numbers first.", { action: "connect-drive", actionLabel: "🔗 Connect Google Drive", action2: "load-sample", action2Label: "👀 Try with sample data" });
   }
 
@@ -6024,7 +6030,7 @@
     state.personalMonth = currentMonthKey();
     state.page = "dashboard";
     updateOverBudgetCategories();
-    showBanner("You're looking at sample data with made-up numbers. Nothing here is saved.", { action: "connect-drive", actionLabel: "🔗 Use my own data", action2: "clear-sample", action2Label: "✖ Clear sample data" });
+    showBanner("You're looking at sample data with made-up numbers. Nothing here is saved.", SIGN_IN_OPEN ? { action: "connect-drive", actionLabel: "🔗 Use my own data", action2: "clear-sample", action2Label: "✖ Clear sample data" } : { action: "clear-sample", actionLabel: "✖ Clear sample data" });
     render();
     window.scrollTo(0, 0);
   }
