@@ -5,7 +5,8 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Budget Ledger</title>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,500;9..144,600&family=Work+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap">
-<script src="https://accounts.google.com/gsi/client" async defer></script>
+<script src="/shared/vendor/supabase-2.118.0.js"></script>
+<script src="/shared/auth.js"></script>
 <!-- Anonymous visit counts (GoatCounter: no cookies, no personal data). Only the page's path is sent, never ledger data. -->
 <script data-goatcounter="https://offthewall.goatcounter.com/count" data-goatcounter-settings='{"path":"/my-budget-ledger/"}' async src="/shared/count.js"></script>
 <style>
@@ -1296,7 +1297,7 @@
   <div id="personal-panel" data-panel="personal"></div>
   <div id="wedding-panel" data-panel="wedding" hidden></div>
 
-  <footer class="foot">Sign-in is coming soon: until then, nothing you enter here is saved. Anonymous visit counts, no cookies. · <a href="/privacy/">Privacy</a></footer>
+  <footer class="foot">Signed in, your budget saves to your own private account. Anonymous visit counts, no cookies. · <a href="/privacy/">Privacy</a></footer>
   <div id="sync-status" class="sync-status"></div>
 </div>
 
@@ -1375,34 +1376,21 @@
   };
 
   // =========================================================================
-  // GOOGLE DRIVE SETUP — do this once before your data will save anywhere:
-  //   1. Go to https://console.cloud.google.com/ and create a project (free).
-  //   2. APIs & Services -> Library -> enable the "Google Drive API".
-  //   3. APIs & Services -> OAuth consent screen -> set it up as "External",
-  //      add yourself as a test user (or publish it — it's just for you).
-  //   4. APIs & Services -> Credentials -> Create Credentials -> OAuth client ID
-  //      -> Application type "Web application".
-  //   5. Under "Authorized JavaScript origins" add the exact URL this page will
-  //      be served from, e.g. https://yourname.github.io (no trailing slash,
-  //      no path). Add http://localhost:PORT too if you test it locally.
-  //   6. Copy the Client ID it gives you (ends in .apps.googleusercontent.com)
-  //      and paste it below, replacing the placeholder text.
-  //   7. Commit and push — GitHub Pages will pick it up automatically.
-  // The app only ever asks Drive for permission to see/edit the ONE file it
-  // creates for itself (scope: drive.file) — it can't see any of your other
-  // Drive files.
+  // SAVING: the ledger saves to the signed-in person's own Off the Wall account
+  // (Supabase; sign-in is shared by every app on the site, see /shared/auth.js).
+  // Each person has one private row, protected by row-level security: only its
+  // owner can read or change it. The table, its rules and their tests live in
+  // the private offthewall-backups repo (migrations/ and tests/).
   // =========================================================================
-  var GOOGLE_CLIENT_ID = "335959224951-jbqspl556j7j1606nfsedduarrsheduc.apps.googleusercontent.com";
-  // Sign-in is switched off until https://offthewall.dev is an Authorized JavaScript origin on this
-  // OAuth client (Google Cloud Console → APIs & Services → Credentials). Google refuses sign-in from
-  // an unlisted origin, so the button would only fail. Set back to true once it's added.
-  var SIGN_IN_OPEN = false;
+  // Kill switch: false hides sign-in, and the page only offers sample data.
+  var SIGN_IN_OPEN = true;
+  // The file the old Google Drive version saved, for the one-time "bring it over" import
   var DRIVE_FILE_NAME = "budget-ledger-data.json";
 
   var currency = new Intl.NumberFormat("en-US", { style: "currency", currency: "USD", maximumFractionDigits: 0 });
   var currencyPrecise = new Intl.NumberFormat("en-US", { style: "currency", currency: "USD" });
 
-  var drive = { tokenClient: null, accessToken: null, fileId: null, connected: false };
+  var cloud = { user: null, connected: false, hasRow: false, version: null, saving: null, pending: false, conflict: false };
   var persistTimer = null;
 
   var state = {
@@ -3160,6 +3148,12 @@
     html += '      </div>';
     html += renderBackupImportPreview();
     html += '    </div>';
+    if(cloud.connected){
+      html += '    <div style="border-top:1px solid var(--border);padding-top:14px;display:flex;flex-direction:column;gap:10px">';
+      html += '      <div class="section-hint">Your budget saves to your own private account. Deleting it removes it from the server for good, so export a full backup first if you might want it back.</div>';
+      html += '      <div><button type="button" class="ghost-btn" style="color:var(--status-critical)" data-action="delete-cloud-ledger">🗑️ Delete my saved budget</button></div>';
+      html += '    </div>';
+    }
     html += '  </div>';
     html += '</section>';
     return html;
@@ -3279,9 +3273,21 @@
       switchAccount();
       return;
     }
-    var reauthDriveBtn = ev.target.closest('[data-action="reauthorize-drive"]');
-    if(reauthDriveBtn){
-      reauthorizeDrive();
+    if(ev.target.closest('[data-action="retry-save"]')){
+      persistToCloudNow();
+      return;
+    }
+    if(ev.target.closest('[data-action="import-drive-file"]')){
+      pickDriveFile();
+      return;
+    }
+    if(ev.target.closest('[data-action="dismiss-first-run"]')){
+      state.firstRun = false;
+      showBanner(null);
+      return;
+    }
+    if(ev.target.closest('[data-action="delete-cloud-ledger"]')){
+      deleteCloudLedger();
       return;
     }
     var signOutBtn = ev.target.closest('[data-action="sign-out"]');
@@ -3407,9 +3413,8 @@
       location.reload();
       return;
     }
-    var connectDriveBtn = ev.target.closest('[data-action="connect-drive"]');
-    if(connectDriveBtn){
-      connectDrive();
+    if(ev.target.closest('[data-action="connect-drive"]')){
+      startSignIn();
       return;
     }
     if(ev.target.closest('[data-action="load-sample"]')){
@@ -4282,8 +4287,12 @@
   function reportSyncError(label, err){
     console.error(label + " sync error", err);
     if(state.syncErrors.indexOf(label) === -1) state.syncErrors.push(label);
-    drive.connected = false;
-    showBanner("Couldn't save to Google Drive just now (your local view is still fine, but changes aren't backed up). This usually means your Drive session expired — reconnect to keep saving.", { warn: true, action: "connect-drive", actionLabel: "🔗 Reconnect Google Drive" });
+    var signedOut = err && (err.status === 401 || err.code === "PGRST301" || /JWT/i.test(err.message || ""));
+    if(signedOut){
+      showBanner("You've been signed out, so changes aren't being saved. Sign in again to keep saving.", { warn: true, action: "sign-in", actionLabel: "🔑 Sign in again" });
+    } else {
+      showBanner("Couldn't save just now. Your view is fine, but the latest changes aren't saved yet.", { warn: true, action: "retry-save", actionLabel: "↻ Try again" });
+    }
     renderSyncStatus();
   }
 
@@ -5256,107 +5265,70 @@
     showToast("Imported " + picked.length + " transaction" + (picked.length === 1 ? "" : "s") + " (" + currencyPrecise.format(total) + ")");
   }
 
-  // ---------- Google Drive auth + sync ----------
+  // ---------- Saving to your account (Supabase) ----------
 
-  function driveConfigured(){
-    return GOOGLE_CLIENT_ID.indexOf("PASTE_YOUR_GOOGLE_CLIENT_ID_HERE") === -1;
+  function cloudConfigured(){
+    return SIGN_IN_OPEN && !!window.otwAuth;
   }
 
-  function connectDrive(){
-    // Leaving the sample: start from a clean slate, so sample data can never reach Drive
+  function startSignIn(chooseAccount){
+    if(!cloudConfigured()){
+      showBanner("Sign-in isn't available right now. Try reloading the page.", { warn: true, action: "reload-page", actionLabel: "↻ Reload" });
+      return;
+    }
+    // Leaving the sample: start from a clean slate, so sample data can never be saved
     if(state.demo) resetToStarter();
-    if(!driveConfigured()){
-      showBanner("This copy hasn't been set up with a Google Client ID yet. See the \"GOOGLE DRIVE SETUP\" comment near the top of the file for the one-time steps, paste your Client ID in, then reload.", { warn: true });
-      return;
-    }
-    if(typeof google === "undefined" || !google.accounts || !google.accounts.oauth2){
-      showBanner("Still loading Google's sign-in library — try again in a second.", { warn: true, action: "connect-drive", actionLabel: "↻ Try again" });
-      return;
-    }
-    showBanner("Connecting to Google Drive…");
-    if(!drive.tokenClient){
-      drive.tokenClient = google.accounts.oauth2.initTokenClient({
-        client_id: GOOGLE_CLIENT_ID,
-        scope: "https://www.googleapis.com/auth/drive.file openid email profile",
-        callback: function(resp){
-          if(!resp || resp.error){
-            showBanner("Google Drive sign-in didn't go through.", { warn: true, action: "connect-drive", actionLabel: "↻ Try again" });
-            return;
-          }
-          drive.accessToken = resp.access_token;
-          // Fetch user info and save
-          fetch("https://www.googleapis.com/oauth2/v2/userinfo", {
-            headers: { Authorization: "Bearer " + resp.access_token }
-          }).then(function(res){ return res.json(); }).then(function(userInfo){
-            if(userInfo && !userInfo.error){
-              saveAuth(userInfo, resp.access_token);
-              renderAuthUI();
-            }
-            loadFromDrive();
-          }).catch(function(){
-            // Continue without saving user info
-            loadFromDrive();
-          });
+    showBanner("Taking you to Google to sign in…");
+    Promise.resolve(window.otwAuth.signIn({ chooseAccount: !!chooseAccount })).then(function(res){
+      if(res && res.error) throw res.error;
+    }).catch(function(err){
+      console.error("Sign-in failed", err);
+      showBanner("Sign-in didn't go through.", { warn: true, action: "sign-in", actionLabel: "↻ Try again" });
+    });
+  }
+
+  function ledgerTable(){
+    return window.otwAuth.db.from("budget_ledgers");
+  }
+
+  function showFirstRunBanner(){
+    showBanner("You're signed in. Moving over from the Google Drive version? Download " + DRIVE_FILE_NAME + " from your Google Drive, then bring it over here. Or just start entering.", { action: "import-drive-file", actionLabel: "📥 Bring over my Drive file", action2: "dismiss-first-run", action2Label: "Start fresh" });
+  }
+
+  // One-time move from the old Google Drive version: its file is a full backup, so it replaces
+  // everything (budgets, expenses, income, subscriptions, vendors, goals) and saves right away.
+  function pickDriveFile(){
+    var input = document.createElement("input");
+    input.type = "file";
+    input.accept = ".json,application/json";
+    input.addEventListener("change", function(){
+      var file = input.files && input.files[0];
+      if(!file) return;
+      var reader = new FileReader();
+      reader.onload = function(){
+        var data = null;
+        try{ data = JSON.parse(String(reader.result || "")); }catch(e){ data = null; }
+        if(!data || typeof data !== "object" || Array.isArray(data) || (!data.expenses && !data.budgets)){
+          showBanner("That isn't a Budget Ledger file. Pick " + DRIVE_FILE_NAME + " from your Google Drive, or a full backup exported from this ledger.", { warn: true, action: "import-drive-file", actionLabel: "📥 Pick another file", action2: "dismiss-first-run", action2Label: "Start fresh" });
+          return;
         }
-      });
-    }
-    drive.tokenClient.requestAccessToken({ prompt: drive.accessToken ? "" : "consent" });
-  }
-
-  function driveApiFetch(url, opts){
-    opts = opts || {};
-    opts.headers = Object.assign({ Authorization: "Bearer " + drive.accessToken }, opts.headers || {});
-    return fetch(url, opts).then(function(res){
-      if(!res.ok){
-        return res.text().then(function(t){
-          var err = new Error("Drive API " + res.status + ": " + t);
-          err.status = res.status;
-          throw err;
+        var n = Array.isArray(data.expenses) ? data.expenses.length : 0;
+        if(!window.confirm("Bring over " + n + " transaction" + (n === 1 ? "" : "s") + ", plus your budgets, income, subscriptions, vendors and goals, from " + file.name + "?")) return;
+        applyLoadedData(data);
+        state.firstRun = false;
+        state.page = "dashboard";
+        updateOverBudgetCategories();
+        showBanner("Saving your budget to your account…");
+        render();
+        persistToCloudNow().then(function(ok){
+          if(!ok) return;
+          showBanner(null);
+          showToast("Brought over " + n + " transaction" + (n === 1 ? "" : "s") + ". Your budget now saves to your account.");
         });
-      }
-      return res;
+      };
+      reader.readAsText(file);
     });
-  }
-
-  function driveFindFile(){
-    var q = encodeURIComponent("name = '" + DRIVE_FILE_NAME + "' and trashed = false");
-    var url = "https://www.googleapis.com/drive/v3/files?q=" + q + "&spaces=drive&fields=files(id,name)";
-    return driveApiFetch(url).then(function(res){ return res.json(); }).then(function(json){
-      return (json.files && json.files[0]) ? json.files[0].id : null;
-    });
-  }
-
-  function driveGetFileContent(fileId){
-    var url = "https://www.googleapis.com/drive/v3/files/" + fileId + "?alt=media";
-    return driveApiFetch(url).then(function(res){ return res.json(); });
-  }
-
-  function driveMultipartCreate(name, dataObj){
-    var boundary = "budgetledger-" + Date.now();
-    var metadata = { name: name, mimeType: "application/json" };
-    var body =
-      "--" + boundary + "\r\n" +
-      "Content-Type: application/json; charset=UTF-8\r\n\r\n" +
-      JSON.stringify(metadata) + "\r\n" +
-      "--" + boundary + "\r\n" +
-      "Content-Type: application/json\r\n\r\n" +
-      JSON.stringify(dataObj) + "\r\n" +
-      "--" + boundary + "--";
-    var url = "https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart&fields=id";
-    return driveApiFetch(url, {
-      method: "POST",
-      headers: { "Content-Type": "multipart/related; boundary=" + boundary },
-      body: body
-    }).then(function(res){ return res.json(); }).then(function(json){ return json.id; });
-  }
-
-  function driveUpdateFileContent(fileId, dataObj){
-    var url = "https://www.googleapis.com/upload/drive/v3/files/" + fileId + "?uploadType=media";
-    return driveApiFetch(url, {
-      method: "PATCH",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(dataObj)
-    });
+    input.click();
   }
 
   function applyLoadedData(data){
@@ -5413,53 +5385,117 @@
     processDueRecurring();
   }
 
-  function loadFromDrive(){
-    showBanner("Loading your data from Google Drive…");
-    driveFindFile().then(function(fileId){
-      if(fileId){
-        drive.fileId = fileId;
-        return driveGetFileContent(fileId).then(function(data){ applyLoadedData(data); });
+  function loadFromCloud(){
+    showBanner("Loading your budget…");
+    Promise.resolve(ledgerTable().select("data, version").eq("user_id", cloud.user.id).maybeSingle()).then(function(res){
+      if(res.error) throw res.error;
+      cloud.conflict = false;
+      if(res.data){
+        cloud.hasRow = true;
+        cloud.version = res.data.version;
+        applyLoadedData(res.data.data);
+        state.firstRun = false;
+        showBanner(null);
+      } else {
+        // First sign-in: nothing saved yet. Starter budgets, plus the offer to bring over the
+        // file from the old Google Drive version. The row is created on the first save.
+        cloud.hasRow = false;
+        cloud.version = null;
+        applyLoadedData({ budgets: { personal: DEFAULT_BUDGETS.personal, wedding: DEFAULT_BUDGETS.wedding } });
+        state.firstRun = true;
+        showFirstRunBanner();
       }
-      // first time connecting — seed starter budgets and create the file in Drive
-      applyLoadedData({ budgets: { personal: DEFAULT_BUDGETS.personal, wedding: DEFAULT_BUDGETS.wedding } });
-      return driveMultipartCreate(DRIVE_FILE_NAME, buildFullBackupObject()).then(function(id){ drive.fileId = id; });
-    }).then(function(){
-      drive.connected = true;
+      cloud.connected = true;
       state.syncErrors = [];
-      showBanner(null);
+      updateOverBudgetCategories();
       render();
       markSynced();
     }).catch(function(err){
-      console.error("Drive load failed", err);
+      console.error("Load failed", err);
+      cloud.connected = false;
       state.budgets.personal = state.budgets.personal || DEFAULT_BUDGETS.personal;
       state.budgets.wedding = state.budgets.wedding || DEFAULT_BUDGETS.wedding;
-      drive.connected = false;
-      showBanner("Couldn't load your data from Google Drive. What's shown below are starter placeholders, not your saved data (which is untouched). Reconnect to try again.", { warn: true, action: "connect-drive", actionLabel: "🔗 Reconnect Google Drive" });
+      showBanner("Couldn't load your budget. What's shown below are starter placeholders, not your saved data (which is untouched).", { warn: true, action: "reload-page", actionLabel: "↻ Try again" });
       render();
     });
   }
 
-  function persistToDriveNow(){
-    if(!drive.connected || !drive.accessToken) return;
+  // Saves only if the server still has the version this page loaded, so two tabs or devices can't
+  // overwrite each other. Resolves true when saved.
+  function persistToCloudNow(){
+    if(!cloud.connected || !cloud.user || state.demo || cloud.conflict) return Promise.resolve(false);
+    if(cloud.saving){ cloud.pending = true; return cloud.saving; }
     var payload = buildFullBackupObject();
-    var work = drive.fileId
-      ? driveUpdateFileContent(drive.fileId, payload)
-      : driveMultipartCreate(DRIVE_FILE_NAME, payload).then(function(id){ drive.fileId = id; });
-    work.then(function(){
+    var query = cloud.hasRow
+      ? ledgerTable().update({ data: payload }).eq("user_id", cloud.user.id).eq("version", cloud.version).select("version")
+      : ledgerTable().insert({ data: payload }).select("version");
+    cloud.saving = Promise.resolve(query).then(function(res){
+      if(res.error) throw res.error;
+      var rows = res.data || [];
+      if(!rows.length){ cloudConflict(); return false; }
+      cloud.hasRow = true;
+      cloud.version = rows[0].version;
       state.syncErrors = [];
       markSynced();
-    }).catch(function(err){ reportSyncError("Google Drive", err); });
+      return true;
+    }).catch(function(err){
+      if(err && err.code === "23505"){ cloudConflict(); return false; } // created in another tab first
+      reportSyncError("your account", err);
+      return false;
+    }).then(function(ok){
+      cloud.saving = null;
+      if(cloud.pending){ cloud.pending = false; return persistToCloudNow(); }
+      return ok;
+    });
+    return cloud.saving;
+  }
+
+  function cloudConflict(){
+    cloud.conflict = true;
+    showBanner("This budget was changed in another tab or on another device, so this page stopped saving rather than overwrite it. Reload to get the latest.", { warn: true, action: "reload-page", actionLabel: "↻ Reload" });
+  }
+
+  // Save anything still waiting (the 800 ms pause after a change) before signing out
+  function flushSave(){
+    if(persistTimer){
+      clearTimeout(persistTimer);
+      persistTimer = null;
+      updateOverBudgetCategories();
+      return persistToCloudNow();
+    }
+    return cloud.saving || Promise.resolve(true);
+  }
+
+  function deleteCloudLedger(){
+    if(!cloud.connected || !cloud.user) return;
+    if(!window.confirm("Delete your saved budget from your account? This can't be undone. Export a full backup first if you might want it back.")) return;
+    if(!window.confirm("Last check: permanently delete every expense, budget and setting saved to your account?")) return;
+    if(persistTimer){ clearTimeout(persistTimer); persistTimer = null; }
+    Promise.resolve(ledgerTable().delete().eq("user_id", cloud.user.id)).then(function(res){
+      if(res.error) throw res.error;
+      cloud.hasRow = false;
+      cloud.version = null;
+      clearLocalCopy();
+      resetToStarter();
+      state.firstRun = true;
+      render();
+      showToast("Deleted your saved budget");
+      showFirstRunBanner();
+    }).catch(function(err){
+      console.error("Delete failed", err);
+      showBanner("Couldn't delete just now. Nothing was removed, so try again in a moment.", { warn: true });
+    });
   }
 
   function schedulePersist(){
-    // Sample data is never saved, to the browser or to Drive
+    // Sample data is never saved, to the browser or to your account
     if(state.demo){ updateOverBudgetCategories(); return; }
     if(persistTimer) clearTimeout(persistTimer);
     persistTimer = setTimeout(function(){
       persistTimer = null;
       updateOverBudgetCategories();
       saveToIndexedDB();
-      persistToDriveNow();
+      persistToCloudNow();
     }, 800);
   }
 
@@ -5543,56 +5579,39 @@
     }
   }
 
-  // ---------- Persistent Google Auth ----------
+  // ---------- Signed-in account ----------
 
   function getSavedAuth(){
-    var saved = localStorage.getItem("budgetLedgerAuth");
-    return saved ? JSON.parse(saved) : null;
-  }
-
-  function saveAuth(userInfo, accessToken){
-    localStorage.setItem("budgetLedgerAuth", JSON.stringify({
-      name: userInfo.name,
-      email: userInfo.email,
-      picture: userInfo.picture,
-      accessToken: accessToken,
-      timestamp: Date.now()
-    }));
-  }
-
-  function clearAuth(){
-    localStorage.removeItem("budgetLedgerAuth");
-    drive.accessToken = null;
-    drive.connected = false;
+    return (cloud.user && window.otwAuth) ? window.otwAuth.profile(cloud.user) : null;
   }
 
   function renderAuthUI(){
     var authSection = document.getElementById("auth-section");
     var savedAuth = getSavedAuth();
-    
-    // Don't show placeholder if still loading
     if(!authSection) return;
-    
+
     if(savedAuth){
+      var pic = savedAuth.picture
+        ? '    <img class="auth-profile-pic" src="' + escapeHtml(savedAuth.picture) + '" alt="" referrerpolicy="no-referrer">'
+        : '';
       authSection.innerHTML =
         '<div class="auth-menu">' +
         '  <div style="display: flex; align-items: center; gap: 8px; cursor: pointer;" id="auth-display" data-action="toggle-auth-menu">' +
-        '    <img class="auth-profile-pic" src="' + escapeHtml(savedAuth.picture) + '" alt="Profile">' +
+        pic +
         '    <div class="auth-user-info">' +
         '      <div class="auth-user-name">' + escapeHtml(savedAuth.name) + '</div>' +
         '      <div class="auth-user-email">' + escapeHtml(savedAuth.email) + '</div>' +
         '    </div>' +
-        '    <button type="button" id="auth-toggle" class="auth-menu-button" data-action="toggle-auth-menu">⋮</button>' +
+        '    <button type="button" id="auth-toggle" class="auth-menu-button" data-action="toggle-auth-menu" aria-label="Account menu">⋮</button>' +
         '  </div>' +
         '  <div id="auth-dropdown" class="auth-dropdown">' +
         '    <button type="button" class="auth-dropdown-item" data-action="switch-account">Switch Account</button>' +
-        '    <button type="button" class="auth-dropdown-item" data-action="reauthorize-drive">Reconnect Google Drive</button>' +
         '    <button type="button" class="auth-dropdown-item danger" data-action="sign-out">Sign Out</button>' +
         '  </div>' +
         '</div>';
       authSection.classList.remove("guest");
     } else {
-      authSection.innerHTML = SIGN_IN_OPEN ? '<button type="button" class="sign-in-btn" id="sign-in-btn" data-action="sign-in">Sign In with Google</button>' : '<span class="signin-soon" title="Google sign-in is switched off for now">Sign-in coming soon</span>';
+      authSection.innerHTML = cloudConfigured() ? '<button type="button" class="sign-in-btn" id="sign-in-btn" data-action="sign-in">Sign In with Google</button>' : '<span class="signin-soon" title="Sign-in is switched off for now">Sign-in coming soon</span>';
       authSection.classList.add("guest");
     }
   }
@@ -5615,67 +5634,32 @@
   }
 
   function initiateSignIn(forceAccountChooser){
-    if(!window.google || !window.google.accounts) {
-      alert("Google Sign-In failed to load. Please refresh the page.");
-      return;
-    }
-
-    var config = {
-      client_id: GOOGLE_CLIENT_ID,
-      scope: "openid email profile https://www.googleapis.com/auth/drive.file",
-      callback: function(resp){
-        if(!resp || resp.error){
-          alert("Sign-in didn't go through. Please try again.");
-          return;
-        }
-        drive.accessToken = resp.access_token;
-        fetch("https://www.googleapis.com/oauth2/v2/userinfo", {
-          headers: { Authorization: "Bearer " + resp.access_token }
-        }).then(function(r){ return r.json(); }).then(function(userInfo){
-          if(userInfo.error){
-            alert("Could not fetch user info: " + userInfo.error);
-            return;
-          }
-          saveAuth(userInfo, resp.access_token);
-          renderAuthUI();
-          closeAuthMenu();
-          loadFromDrive();
-        }).catch(function(err){
-          console.error("Auth error:", err);
-          alert("Authentication failed. Please try again.");
-        });
-      }
-    };
-    if(forceAccountChooser) config.prompt = "select_account";
-    window.google.accounts.oauth2.initTokenClient(config).requestAccessToken();
+    closeAuthMenu();
+    startSignIn(forceAccountChooser);
   }
 
   function switchAccount(){
     closeAuthMenu();
-    clearAuth();
-    renderAuthUI();
-    initiateSignIn(true);
+    flushSave().then(function(){ return window.otwAuth.signOut(); }).then(function(){ startSignIn(true); });
   }
 
   function signOut(){
     closeAuthMenu();
-    clearAuth();
-    renderAuthUI();
-    drive.connected = false;
-    state.budgets.personal = DEFAULT_BUDGETS.personal;
-    state.budgets.wedding = DEFAULT_BUDGETS.wedding;
-    showBanner("Signed out. Your data was not deleted. Sign in again to sync.", { warn: true, action: "connect-drive", actionLabel: "🔗 Sign In with Google" });
-    render();
+    flushSave().then(function(){ return window.otwAuth.signOut(); }).then(showSignedOut, showSignedOut);
   }
 
-  function reauthorizeDrive(){
-    closeAuthMenu();
-    var savedAuth = getSavedAuth();
-    if(!savedAuth){
-      initiateSignIn();
-      return;
-    }
-    connectDrive();
+  // Signed out (here or in another tab): forget the budget on this page and on this device
+  function showSignedOut(){
+    cloud.user = null;
+    cloud.connected = false;
+    cloud.hasRow = false;
+    cloud.version = null;
+    cloud.conflict = false;
+    clearLocalCopy();
+    resetToStarter();
+    renderAuthUI();
+    showBanner("Signed out. Your budget is safe in your account: sign in again to open it.", { action: "sign-in", actionLabel: "🔑 Sign In with Google" });
+    render();
   }
 
   // ---------- Offline Mode & IndexedDB ----------
@@ -5684,7 +5668,7 @@
     window.addEventListener("online", function(){
       state.isOnline = true;
       showBanner("Back online! Syncing your changes now…");
-      persistToDriveNow();
+      persistToCloudNow();
       render();
     });
     window.addEventListener("offline", function(){
@@ -5716,6 +5700,12 @@
       var store = tx.objectStore("data");
       store.put({ id: "budgetData", data: buildFullBackupObject(), timestamp: Date.now() });
     }catch(e){ console.log("IndexedDB save failed", e); }
+  }
+
+  function clearLocalCopy(){
+    if(!window.budgetDB) return;
+    try{ window.budgetDB.transaction(["data"], "readwrite").objectStore("data").delete("budgetData"); }
+    catch(e){ console.log("IndexedDB clear failed", e); }
   }
 
   function loadFromIndexedDB(){
@@ -5988,33 +5978,46 @@
     render();
     initSample();
 
-    if(!driveConfigured()){
-      showBanner("This copy hasn't been set up with a Google Client ID yet, so what's shown below are starter placeholders that won't be saved. See the \"GOOGLE DRIVE SETUP\" comment near the top of the file for the one-time steps.", { warn: true, action: "load-sample", actionLabel: "👀 Try with sample data" });
+    if(!cloudConfigured()){
+      if(/[?&]sample\b/.test(location.search)) loadSampleData(); // the cover's "Try it with sample data"
+      else showStartBanner();
       return;
     }
 
-    var savedAuth = getSavedAuth();
-    if(savedAuth){
-      drive.accessToken = savedAuth.accessToken;
-      showBanner("Loading your data from Google Drive…");
-      loadFromDrive();
-    } else if(/[?&]sample\b/.test(location.search)){
-      loadSampleData(); // a link straight into the sample (the cover's "Try it with sample data")
-    } else {
-      showStartBanner();
-    }
+    window.otwAuth.ready.then(function(user){
+      if(user){
+        cloud.user = user;
+        renderAuthUI();
+        loadFromCloud();
+      } else if(/[?&]sample\b/.test(location.search)){
+        loadSampleData();
+      } else {
+        showStartBanner();
+      }
+    });
+    // Signed in or out in another tab
+    window.otwAuth.onChange(function(user){
+      if(user && (!cloud.user || cloud.user.id !== user.id)){
+        cloud.user = user;
+        state.demo = false;
+        renderAuthUI();
+        loadFromCloud();
+      } else if(!user && cloud.user){
+        showSignedOut();
+      }
+    });
   }
 
   function showStartBanner(){
-    if(!SIGN_IN_OPEN){ showBanner("Sign-in is coming soon. Until then nothing you enter here is saved, so look around with made-up numbers.", { action: "load-sample", actionLabel: "👀 Try with sample data" }); return; }
-    showBanner("Connect Google Drive to load and save your data, or look around with made-up numbers first.", { action: "connect-drive", actionLabel: "🔗 Connect Google Drive", action2: "load-sample", action2Label: "👀 Try with sample data" });
+    if(!cloudConfigured()){ showBanner("Sign-in is switched off for now, so nothing you enter here is saved. Look around with made-up numbers.", { action: "load-sample", actionLabel: "👀 Try with sample data" }); return; }
+    showBanner("Sign in with Google to keep your budget in your own private account, or look around with made-up numbers first.", { action: "sign-in", actionLabel: "🔑 Sign In with Google", action2: "load-sample", action2Label: "👀 Try with sample data" });
   }
 
   // ---------- Sample data ----------
   // "Try with sample data" fills both trackers with made-up numbers so a visitor can see every chart
   // without signing in. It's never saved (schedulePersist skips it), dates are placed relative to
   // today so the current month always has activity, and the same day always gives the same numbers.
-  // Connecting Google Drive or "Clear sample data" goes back to a clean slate.
+  // Signing in or "Clear sample data" goes back to a clean slate.
 
   function resetToStarter(){
     state.demo = false;
@@ -6024,13 +6027,13 @@
   }
 
   function loadSampleData(){
-    if(drive.connected) return; // real data is open: never mix the two
+    if(cloud.connected) return; // real data is open: never mix the two
     applyLoadedData(buildSampleData());
     state.demo = true;
     state.personalMonth = currentMonthKey();
     state.page = "dashboard";
     updateOverBudgetCategories();
-    showBanner("You're looking at sample data with made-up numbers. Nothing here is saved.", SIGN_IN_OPEN ? { action: "connect-drive", actionLabel: "🔗 Use my own data", action2: "clear-sample", action2Label: "✖ Clear sample data" } : { action: "clear-sample", actionLabel: "✖ Clear sample data" });
+    showBanner("You're looking at sample data with made-up numbers. Nothing here is saved.", cloudConfigured() ? { action: "sign-in", actionLabel: "🔑 Sign in to use my own data", action2: "clear-sample", action2Label: "✖ Clear sample data" } : { action: "clear-sample", actionLabel: "✖ Clear sample data" });
     render();
     window.scrollTo(0, 0);
   }
@@ -6038,7 +6041,7 @@
   function clearSampleData(){
     resetToStarter();
     updateOverBudgetCategories();
-    if(driveConfigured()) showStartBanner();
+    if(cloudConfigured()) showStartBanner();
     else showBanner("Sample data cleared.", { action: "load-sample", actionLabel: "👀 Try with sample data" });
     render();
   }

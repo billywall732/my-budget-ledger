@@ -1,11 +1,11 @@
 <p align="center">
-  <img src="docs/cover.svg" alt="My Budget Ledger — personal and wedding budgets, synced to your own Google Drive" width="100%">
+  <img src="docs/cover.svg" alt="My Budget Ledger — personal and wedding budgets, saved to your own private account" width="100%">
 </p>
 
 <h1 align="center">My Budget Ledger</h1>
 
 <p align="center">
-  <em>A single-file, no-build budget tracker for personal expenses and a wedding budget, backed by your own Google Drive — no server, no database, no account to create beyond your Gmail login.</em>
+  <em>A single-file, no-build budget tracker for personal expenses and a wedding budget. Sign in with Google and it saves to your own private account.</em>
 </p>
 
 <p align="center">
@@ -15,8 +15,8 @@
 <p align="center">
   <a href="#using-the-app">Using the app</a> ·
   <a href="#features">Features</a> ·
+  <a href="#how-saving-works">How saving works</a> ·
   <a href="#running-it-locally">Running it locally</a> ·
-  <a href="#setting-up-your-own-google-drive-sync-optional-one-time">Drive sync setup</a> ·
   <a href="#tech">Tech</a>
 </p>
 
@@ -25,12 +25,20 @@
 ## Using the app
 
 1. Open the live link above.
-2. Click **Sync with Google Drive**.
-3. Log in with your Gmail. If you see an "unverified app" warning, click **Advanced -> Go to My Budget App**.
+2. Click **Sign In with Google**. Google shares only your name, email address and profile picture.
+3. Start entering, or bring over your data (below).
 
-Your data is stored in a single JSON file in your own Google Drive and is never seen by anyone else. The app only requests the `drive.file` scope, so it can only read/write the one file it creates for itself — it cannot see any of your other Drive files.
+Not ready to sign in? **Try with sample data** fills the app with made-up numbers. Nothing in the sample is ever saved.
 
-If you skip syncing, the app still works entirely offline using local browser storage; connecting Drive just adds backup/sync across devices.
+### Moving over from the Google Drive version
+
+Earlier versions saved a file called `budget-ledger-data.json` to your Google Drive. To move it:
+
+1. Download `budget-ledger-data.json` from your Google Drive.
+2. Sign in to the app. The first time, it offers **Bring over my Drive file**.
+3. Pick the file and confirm. Everything comes across (budgets, expenses, income, subscriptions, salary setup, vendors and savings goals) and saves to your account.
+
+The Drive file isn't changed or deleted; remove it yourself once you're happy.
 
 ## Features
 
@@ -43,46 +51,37 @@ If you skip syncing, the app still works entirely offline using local browser st
 - **Savings goals**: set targets and track progress toward them.
 - **Vendors** (wedding tracker): tag expenses to vendors and see per-vendor totals.
 - **Bulk import from Excel**: download an `.xlsx` template (with a Lists tab of your categories, cards, accounts, and vendors), fill it in, and upload it back. Every row is previewed with warnings and duplicate detection before anything is added.
-- **CSV/JSON export & import**: back up or move your data outside of Drive sync.
+- **CSV/JSON export & import**: export a full backup any time, or restore from one.
 - **Light/dark theme toggle** and a share button for sending the app link to others.
+
+## How saving works
+
+- Sign-in is shared by every app on [offthewall.dev](https://offthewall.dev), through [Supabase](https://supabase.com/) Auth with Google (`/shared/auth.js` in the site repo).
+- Each person's ledger is one row in a Supabase (Postgres) table, stored in the same JSON shape as the app's full backup. Row-level security means only its owner can read or change it.
+- Every save says which version it started from. If the ledger changed in another tab or on another device, the save is refused and the page asks you to reload, so nothing is silently overwritten.
+- Earlier versions are kept automatically (at most one every 30 minutes, the newest 50), and the whole database is backed up nightly.
+- **Manage → Your data → Delete my saved budget** removes your ledger from the server.
+
+The table, its security rules and their tests live in the site owner's private database repo.
 
 ## Running it locally
 
-This is a static single HTML file with no build step and no dependencies.
+This is a static single HTML file with no build step. It loads the shared sign-in from the main site (`/shared/vendor/` and `/shared/auth.js`), so run it alongside the [site repo](https://github.com/billywall732/billywall732.github.io) with this folder served at `/my-budget-ledger/`. On its own, everything except sign-in works, including the sample data.
 
-```
-# from the repo root
-python -m http.server 8080
-# then open http://localhost:8080
-```
-
-Opening `index.html` directly from disk also works for everything except Google Drive sync, since Google requires an authorized origin (see below).
-
-## Setting up your own Google Drive sync (optional, one-time)
-
-The deployed app already has a configured Google OAuth client. If you fork this repo and deploy your own copy, you'll need your own client ID so Google will authorize your domain:
-
-1. Go to https://console.cloud.google.com/ and create a project (free).
-2. **APIs & Services -> Library** -> enable the **Google Drive API**.
-3. **APIs & Services -> OAuth consent screen** -> set it up as "External", add yourself as a test user (or publish it — it's just for you).
-4. **APIs & Services -> Credentials -> Create Credentials -> OAuth client ID** -> Application type "Web application".
-5. Under "Authorized JavaScript origins" add the exact URL this page will be served from, e.g. `https://yourname.github.io` (no trailing slash, no path). Add `http://localhost:PORT` too if you test locally.
-6. Copy the Client ID (ends in `.apps.googleusercontent.com`) and paste it into the `GOOGLE_CLIENT_ID` constant near the top of `index.html`.
-7. Commit and push — GitHub Pages will pick it up automatically.
+Sign-in works locally on `http://localhost:8123`, which is on the Supabase project's list of allowed addresses.
 
 ## Tech
 
-Plain HTML/CSS/JavaScript in a single file (`index.html`), no framework, no build tooling, no package manager. Deployed via GitHub Pages.
+Plain HTML/CSS/JavaScript in a single file (`index.html`), no framework, no build tooling. Deployed via GitHub Pages.
 
 | Piece | Used for |
 |---|---|
-| Google Identity Services | Sign-in with Google, `drive.file` scope only |
-| Google Drive API (v3) | Saving and syncing the one JSON data file in your own Drive |
+| Supabase (Auth + Postgres) | Sign-in with Google, and saving each person's ledger privately |
 | IndexedDB + localStorage | Working offline and remembering settings in the browser |
 | SheetJS (loaded on demand) | The Excel import template and bulk import |
 | Hand-drawn SVG | Every chart, with no chart library |
 | Web Share API | The share button |
-| GitHub Pages | Hosting, at https://offthewall.dev/my-budget-ledger/ |
+| GitHub Pages + Cloudflare | Hosting at https://offthewall.dev/my-budget-ledger/, with security headers |
 
 Ideas for what's next are tracked in [GitHub Issues](https://github.com/billywall732/my-budget-ledger/issues).
 
