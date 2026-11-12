@@ -83,6 +83,8 @@ Plain HTML/CSS/JavaScript in a single file (`index.html`), no framework, no buil
 | Web Share API | The share button |
 | GitHub Pages + Cloudflare | Hosting at https://offthewall.dev/my-budget-ledger/, with security headers |
 
+**Home-screen icon:** `app-icon.svg` (a gold coin) is the source for `icon-180.png` (iPhone) and `icon-192.png` / `icon-512.png` (Android, listed in `manifest.webmanifest`). The PNGs are screenshots of the SVG at those sizes; remake them after changing it. It matches the other Off the Wall app icons: one object on a dark glow in the app's color, with two white swooshes.
+
 Ideas for what's next are tracked in [GitHub Issues](https://github.com/billywall732/my-budget-ledger/issues).
 
 ## License
